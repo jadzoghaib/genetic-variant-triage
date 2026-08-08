@@ -1,0 +1,1159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genetic variant triage — a manual</title>
+<meta name="description" content="How inconclusive genetic test results are triaged by reconciling AlphaMissense predictions against ClinVar assertions on AlphaFold structure.">
+<style>
+  :root {
+    color-scheme: light;
+    --paper:      #f6f7f9;
+    --panel:      #ffffff;
+    --ink:        #12151a;
+    --ink-2:      #4a525e;
+    --muted:      #7c8593;
+    --rule:       #dee3ea;
+    --rule-soft:  #eaeef3;
+    --accent:     #2a78d6;
+    --accent-bg:  #eaf1fc;
+
+    /* Data encodings, identical in meaning to the console itself. */
+    --benign:     #2a78d6;
+    --ambiguous:  #8a8f98;
+    --pathogenic: #c93b36;
+    --tier-1:     #1c5cab;   /* experimentally solved   — darkest on paper */
+    --tier-2:     #3987e5;   /* confidently predicted   */
+    --tier-3:     #9ec5f4;   /* predicted, unreliable   — lightest */
+    --warn:       #a56a00;
+
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Source Serif Pro", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --paper: #131519; --panel: #191c21; --ink: #edeff2; --ink-2: #b0b8c4;
+      --muted: #7f8895; --rule: #272b32; --rule-soft: #1f2329;
+      --accent: #5b9bea; --accent-bg: #17222f;
+      --benign: #5b9bea; --ambiguous: #7f8792; --pathogenic: #e66767;
+      /* The ordinal ramp inverts: on a dark ground the brightest step reads
+         as strongest, so "experimentally solved" is the light end. */
+      --tier-1: #cde2fb; --tier-2: #6da7ec; --tier-3: #2a5e9e;
+      --warn: #e0a133;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #131519; --panel: #191c21; --ink: #edeff2; --ink-2: #b0b8c4;
+    --muted: #7f8895; --rule: #272b32; --rule-soft: #1f2329;
+    --accent: #5b9bea; --accent-bg: #17222f;
+    --benign: #5b9bea; --ambiguous: #7f8792; --pathogenic: #e66767;
+    --tier-1: #cde2fb; --tier-2: #6da7ec; --tier-3: #2a5e9e;
+    --warn: #e0a133;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    padding: 3.5rem 1.5rem 2.25rem;
+  }
+  /* The masthead mirrors the document grid so the headline shares a left edge
+     with the prose below it, instead of floating on its own measure. */
+  .masthead-inner { max-width: 60rem; margin: 0 auto; }
+  @media (min-width: 1080px) {
+    .masthead-inner {
+      max-width: 74rem; display: grid; gap: 3.5rem;
+      grid-template-columns: 13rem minmax(0, 1fr);
+    }
+    .masthead-inner > * { grid-column: 2; }
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 0.9rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.12rem; color: var(--ink-2); max-width: 46rem; margin: 0;
+    text-wrap: pretty;
+  }
+
+  .doc { display: grid; gap: 2.5rem; padding: 2.5rem 1.5rem 6rem;
+         max-width: 60rem; margin: 0 auto; }
+  @media (min-width: 1080px) {
+    .doc { grid-template-columns: 13rem minmax(0, 1fr); max-width: 74rem;
+           gap: 3.5rem; align-items: start; }
+  }
+
+  nav.toc { font-size: 0.86rem; }
+  @media (min-width: 1080px) { nav.toc { position: sticky; top: 2rem; } }
+  nav.toc p {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 0.7rem;
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0;
+               display: flex; flex-direction: column; gap: 0.32rem;
+               counter-reset: toc; }
+  nav.toc a {
+    color: var(--ink-2); text-decoration: none; display: block;
+    padding: 0.12rem 0; border-left: 2px solid transparent; padding-left: 0.7rem;
+  }
+  nav.toc a::before {
+    counter-increment: toc; content: counter(toc) ". ";
+    font-family: var(--mono); font-size: 0.78em; color: var(--muted);
+  }
+  nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+
+  main { min-width: 0; counter-reset: sec; }
+  section { margin-bottom: 3.25rem; scroll-margin-top: 1.5rem; }
+  section > * { max-width: 42rem; }
+
+  h2 {
+    font-family: var(--serif); font-size: 1.6rem; font-weight: 600;
+    letter-spacing: -0.012em; line-height: 1.2; margin: 0 0 1.1rem;
+    padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+  }
+  h2::before {
+    counter-increment: sec; content: counter(sec);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--accent);
+    display: block; margin-bottom: 0.5rem; letter-spacing: 0.1em;
+  }
+  h3 { font-family: var(--sans); font-size: 1rem; font-weight: 650;
+       margin: 2rem 0 0.55rem; letter-spacing: -0.005em; }
+  p { margin: 0 0 1rem; text-wrap: pretty; }
+  a { color: var(--accent); }
+  a:focus-visible, nav.toc a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px;
+  }
+
+  code, .id { font-family: var(--mono); font-size: 0.86em;
+              background: var(--rule-soft); padding: 0.1em 0.34em;
+              border-radius: 3px; }
+  strong { font-weight: 650; }
+
+  ul, ol.body { padding-left: 1.15rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.4rem; }
+
+  .lede { font-size: 1.06rem; color: var(--ink-2); }
+
+  .callout {
+    border-left: 2px solid var(--accent); background: var(--accent-bg);
+    padding: 0.9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 4px 4px 0;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.warn { border-left-color: var(--warn);
+                  background: color-mix(in srgb, var(--warn) 9%, transparent); }
+
+  /* Wide content escapes the reading measure and scrolls on its own. */
+  .wide { max-width: none; overflow-x: auto; margin: 1.8rem 0; }
+
+  figure { margin: 0; }
+  figure svg { max-width: 100%; height: auto; display: block;
+               color: var(--ink-2); }
+  figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.7rem;
+               max-width: 42rem; text-wrap: pretty; }
+
+  table { border-collapse: collapse; font-size: 0.87rem; min-width: 100%; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem;
+           border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em;
+             text-transform: uppercase; color: var(--muted);
+             border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums;
+         font-family: var(--mono); }
+
+  /* The triage matrix: the cell tint carries the outcome class, the label
+     carries the meaning — colour is never the only channel. */
+  .matrix td { border: 1px solid var(--rule); }
+  .matrix .rowhead { font-weight: 650; background: var(--rule-soft); white-space: nowrap; }
+  .cell-act  { background: color-mix(in srgb, var(--pathogenic) 13%, transparent); }
+  .cell-down { background: color-mix(in srgb, var(--benign) 13%, transparent); }
+  .cell-neut { background: color-mix(in srgb, var(--ambiguous) 12%, transparent); }
+  .cell-ok   { background: transparent; }
+  .outcome { font-family: var(--mono); font-size: 0.8rem; display: block; }
+  .note { color: var(--muted); font-size: 0.78rem; }
+
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+            margin-right: 0.4rem; vertical-align: baseline; }
+
+  .srcs { display: grid; gap: 1px; background: var(--rule);
+          border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; }
+  .src { background: var(--panel); padding: 1.1rem 1.2rem; }
+  .src h3 { margin: 0 0 0.15rem; font-size: 1.02rem; }
+  .src .who { font-family: var(--mono); font-size: 0.74rem; color: var(--muted);
+              margin-bottom: 0.6rem; }
+  .src p { margin-bottom: 0.6rem; font-size: 0.95rem; }
+  .src p:last-child { margin-bottom: 0; }
+  .limit { color: var(--ink-2); font-size: 0.9rem; }
+  .limit b { color: var(--ink); }
+
+  pre { background: var(--panel); border: 1px solid var(--rule);
+        border-radius: 5px; padding: 0.9rem 1.1rem; overflow-x: auto;
+        font-family: var(--mono); font-size: 0.83rem; line-height: 1.6;
+        margin: 1.2rem 0; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  footer { border-top: 1px solid var(--rule); padding: 2.5rem 1.5rem 4rem;
+           color: var(--muted); font-size: 0.85rem; }
+  footer .footer-inner { max-width: 60rem; margin: 0 auto; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Manual · genetic-variant-triage</div>
+    <h1>When a genetic test says “we don’t know”</h1>
+    <p class="standfirst">
+      Roughly half of the missense variants in ClinVar are filed as uncertain —
+      real mutations in real patients that nobody has been able to call harmful
+      or harmless. This is a manual for a tool that reconciles an AI model’s
+      opinion against that curated record, and — the part that matters — grades
+      how much structural evidence actually stands behind each call.
+    </p>
+  </div>
+</header>
+
+<div class="doc">
+
+<nav class="toc" aria-label="Contents">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#problem">The problem</a></li>
+    <li><a href="#idea">The idea</a></li>
+    <li><a href="#sources">Where the data comes from</a></li>
+    <li><a href="#predictions">How a machine can score a mutation</a></li>
+    <li><a href="#matrix">The triage matrix</a></li>
+    <li><a href="#confidence">Structural confidence</a></li>
+    <li><a href="#priority">Building a worklist</a></li>
+    <li><a href="#dossier">The second question</a></li>
+    <li><a href="#architecture">How it is built</a></li>
+    <li><a href="#governance">Decisions and the record</a></li>
+    <li><a href="#limits">What it does not do</a></li>
+    <li><a href="#running">Running it</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ─────────────────────────────────────────────────────────── 1 ── -->
+<section id="problem">
+  <h2>The problem</h2>
+
+  <p class="lede">
+    A person is tested for a hereditary cancer risk. The lab sequences the
+    relevant genes, finds a single letter of DNA that differs from the reference,
+    and reports back. Sometimes the report says pathogenic. Sometimes benign.
+    Very often it says neither.
+  </p>
+
+  <p>
+    That third answer is a <strong>variant of uncertain significance</strong> —
+    a VUS. It does not mean the mutation is harmless. It means no one has
+    assembled enough evidence to say either way. The patient gets a result that
+    cannot inform a decision: no basis for surveillance, no basis for surgery,
+    no basis for testing relatives.
+  </p>
+
+  <p>
+    Uncertainty is the default because certainty is expensive. Calling a variant
+    requires seeing it in enough families, or running a functional assay, or
+    finding it in the literature. Sequencing has raced ahead of that work.
+    Every genome sequenced finds new variants faster than anyone can
+    characterise them, and the rare ones — the ones most likely to matter — are
+    by definition the ones seen least often.
+  </p>
+
+  <p>
+    Across the four genes this tool loads, ClinVar records
+    <strong>6,488 missense variants as uncertain or conflicting</strong>. Each
+    one is somebody’s inconclusive test result.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 2 ── -->
+<section id="idea">
+  <h2>The idea</h2>
+
+  <p>
+    A machine-learning model can produce a prediction for every possible
+    mutation in every human protein, including all the ones ClinVar is stuck on.
+    That is useful and dangerous in equal measure: useful because it covers the
+    gap, dangerous because a prediction presented with the same confidence as a
+    curated clinical judgement invites people to treat them as equivalent.
+  </p>
+
+  <p>The tool does three things, in order:</p>
+
+  <ol class="body">
+    <li>
+      <strong>Reconcile.</strong> Line the model’s prediction up against
+      ClinVar’s assertion for the same variant. Where ClinVar says uncertain
+      and the model is confident, that is a candidate for a second look.
+    </li>
+    <li>
+      <strong>Grade the evidence.</strong> A prediction about a protein depends
+      on knowing the protein’s shape. Sometimes that shape has been physically
+      determined in a laboratory; sometimes it is itself a prediction that the
+      predicting model is unsure about. Those are not the same, and the tool
+      refuses to display them as though they were.
+    </li>
+    <li>
+      <strong>Hand it to a human.</strong> The output is a ranked worklist of
+      candidates for expert review, with the reasoning attached. It is not a
+      diagnosis and never claims to be.
+    </li>
+  </ol>
+
+  <div class="callout">
+    <p>
+      That third point is a constraint enforced in code, not just a disclaimer.
+      A test in the suite fails if any review outcome in the vocabulary reads
+      like a clinical call — <code>endorsed</code> and <code>rejected</code>
+      are permitted; anything matching <code>pathogenic</code> or
+      <code>benign</code> is not.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 3 ── -->
+<section id="sources">
+  <h2>Where the data comes from</h2>
+
+  <p>
+    Five public sources, none requiring an API key, none requiring a GPU.
+    Nothing here is folded, inferred or trained locally — every model output
+    consumed has already been computed and published by someone else.
+  </p>
+
+  <div class="wide">
+  <figure>
+    <svg viewBox="0 0 900 340" role="img" aria-label="Five public data sources flow into one ontology database, then through a pure rules layer, and out to two surfaces: a variant console and a target dossier.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="system-ui, sans-serif" font-size="12" fill="currentColor">
+
+        <!-- sources -->
+        <g stroke="currentColor" stroke-width="1" fill="none" opacity="0.85">
+          <rect x="8"  y="18"  width="150" height="38" rx="3"/>
+          <rect x="8"  y="70"  width="150" height="38" rx="3"/>
+          <rect x="8"  y="122" width="150" height="38" rx="3"/>
+          <rect x="8"  y="174" width="150" height="38" rx="3"/>
+          <rect x="8"  y="226" width="150" height="38" rx="3"/>
+        </g>
+        <text x="20" y="35">AlphaFold DB</text>
+        <text x="20" y="50" font-size="10.5" opacity="0.7">structure + pLDDT</text>
+        <text x="20" y="87">AlphaMissense</text>
+        <text x="20" y="102" font-size="10.5" opacity="0.7">variant scores</text>
+        <text x="20" y="139">ClinVar</text>
+        <text x="20" y="154" font-size="10.5" opacity="0.7">clinical assertions</text>
+        <text x="20" y="191">Open Targets</text>
+        <text x="20" y="206" font-size="10.5" opacity="0.7">disease + drugs</text>
+        <text x="20" y="243">RCSB PDB</text>
+        <text x="20" y="258" font-size="10.5" opacity="0.7">solved structures</text>
+
+        <!-- arrows into ontology -->
+        <g stroke="currentColor" stroke-width="1.1" marker-end="url(#ar)" fill="none">
+          <path d="M158 37  C 205 37,  215 120, 258 138"/>
+          <path d="M158 89  C 205 89,  218 128, 258 143"/>
+          <path d="M158 141 L 258 148"/>
+          <path d="M158 193 C 205 193, 218 168, 258 156"/>
+          <path d="M158 245 C 205 245, 215 180, 258 162"/>
+        </g>
+        <text x="176" y="126" font-size="10" opacity="0.75">per accession</text>
+        <text x="176" y="176" font-size="10" opacity="0.75">byte-range fetch</text>
+
+        <!-- ontology -->
+        <rect x="258" y="112" width="168" height="76" rx="3"
+              stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <text x="272" y="136" font-weight="600">ontology</text>
+        <text x="272" y="153" font-size="10.5" opacity="0.75">23 typed tables</text>
+        <text x="272" y="168" font-size="10.5" opacity="0.75">provenance on every row</text>
+
+        <path d="M426 150 L 496 150" stroke="currentColor" stroke-width="1.1"
+              marker-end="url(#ar)" fill="none"/>
+        <text x="432" y="142" font-size="10" opacity="0.75">dataframes</text>
+
+        <!-- rules -->
+        <rect x="496" y="112" width="150" height="76" rx="3"
+              stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <text x="510" y="136" font-weight="600">rules</text>
+        <text x="510" y="153" font-size="10.5" opacity="0.75">pure functions</text>
+        <text x="510" y="168" font-size="10.5" opacity="0.75">no I/O, no database</text>
+
+        <g stroke="currentColor" stroke-width="1.1" marker-end="url(#ar)" fill="none">
+          <path d="M646 138 C 690 138, 700 96, 740 92"/>
+          <path d="M646 162 C 690 162, 700 206, 740 210"/>
+        </g>
+        <text x="654" y="98" font-size="10" opacity="0.75">decided classes</text>
+
+        <!-- surfaces -->
+        <g stroke="currentColor" stroke-width="1" fill="none" opacity="0.85">
+          <rect x="740" y="66"  width="152" height="52" rx="3"/>
+          <rect x="740" y="184" width="152" height="52" rx="3"/>
+        </g>
+        <text x="754" y="88" font-weight="600">variant console</text>
+        <text x="754" y="105" font-size="10.5" opacity="0.75">which are misclassified</text>
+        <text x="754" y="206" font-weight="600">target dossier</text>
+        <text x="754" y="223" font-size="10.5" opacity="0.75">is the gene worth pursuing</text>
+
+        <!-- static export note -->
+        <path d="M816 236 L 816 282" stroke="currentColor" stroke-width="1"
+              stroke-dasharray="3 3" marker-end="url(#ar)" fill="none"/>
+        <text x="700" y="302" font-size="10.5" opacity="0.75">exported as static files — the browser only renders</text>
+      </g>
+    </svg>
+    <figcaption>
+      Everything upstream of the rules layer is fetching and typing. Everything
+      downstream is rendering. The rules in the middle touch no database and no
+      user interface, which is why the entire frontend was replaced once without
+      a single rule changing.
+    </figcaption>
+  </figure>
+  </div>
+
+  <div class="srcs wide">
+    <div class="src">
+      <h3>ClinVar</h3>
+      <div class="who">US National Center for Biotechnology Information</div>
+      <p>
+        A public archive where clinical laboratories, hospitals and expert
+        panels deposit what they have concluded about specific variants. It is
+        accumulated human judgement, and it carries its own confidence signal: a
+        star rating from zero (an assertion with no stated criteria) to four
+        (a professional practice guideline).
+      </p>
+      <p class="limit">
+        <b>Its limit:</b> coverage is uneven and the uncertain pile is enormous.
+        Of the uncertain variants this tool loads, <b>80% carry only one star</b>
+        — a single submitter, no corroboration. The tool separates those out
+        rather than counting them alongside expert-panel calls.
+      </p>
+    </div>
+
+    <div class="src">
+      <h3>AlphaMissense</h3>
+      <div class="who">Google DeepMind · <span class="id">CC BY-NC-SA 4.0</span></div>
+      <p>
+        A model that scores every possible single-amino-acid substitution in the
+        human proteome — roughly 71 million of them — for how likely it is to
+        break the protein. It publishes a number from 0 to 1 and a class:
+        likely benign, ambiguous, or likely pathogenic.
+      </p>
+      <p class="limit">
+        <b>Its limit:</b> it predicts a <b>molecular</b> effect, not a clinical
+        one, and its class thresholds were calibrated on ClinVar — which
+        constrains what agreement with ClinVar is allowed to prove. Both points
+        are unpacked in §11.
+      </p>
+    </div>
+
+    <div class="src">
+      <h3>AlphaFold Protein Structure Database</h3>
+      <div class="who">EMBL-EBI &amp; Google DeepMind</div>
+      <p>
+        Predicted three-dimensional structures for essentially every known
+        protein, free to download. Critically it also publishes
+        <span class="id">pLDDT</span> — a per-residue score, 0 to 100, in which
+        the model states how much it trusts its own answer at that specific
+        position.
+      </p>
+      <p class="limit">
+        <b>Its limit:</b> a predicted structure is a single static snapshot.
+        Real proteins move, and low confidence sometimes means the region has no
+        fixed shape at all rather than that the model failed.
+      </p>
+    </div>
+
+    <div class="src">
+      <h3>RCSB Protein Data Bank</h3>
+      <div class="who">Research Collaboratory for Structural Bioinformatics</div>
+      <p>
+        The archive of structures determined <em>experimentally</em> — by X-ray
+        crystallography, NMR or cryo-electron microscopy. Each entry records
+        which stretch of the protein it actually resolved.
+      </p>
+      <p class="limit">
+        <b>Its limit:</b> coverage is domain-shaped, never whole-protein. The
+        pieces that crystallise are the rigid, well-behaved ones; floppy regions
+        are systematically under-represented.
+      </p>
+    </div>
+
+    <div class="src">
+      <h3>Open Targets Platform</h3>
+      <div class="who">EMBL-EBI, Wellcome Sanger Institute and partners</div>
+      <p>
+        Aggregated evidence linking genes to diseases, scored and split by the
+        <em>kind</em> of evidence — genetic association, literature co-mention,
+        known drugs, somatic mutation. It also carries tractability assessments,
+        the drugs known to act on a target, and the clinical trials they appear
+        in.
+      </p>
+      <p class="limit">
+        <b>Its limit:</b> a high overall score can be driven entirely by
+        literature volume. The split matters more than the headline, which is
+        why the dossier shows the components rather than the total.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p>
+      Probing these APIs before designing anything paid for itself immediately.
+      Open Targets already aggregates ChEMBL drug mechanisms <em>and</em>
+      clinical trials, so two planned connectors were deleted before they were
+      written — including the one dependency that had been returning server
+      errors during testing.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 4 ── -->
+<section id="predictions">
+  <h2>How a machine can score a mutation</h2>
+
+  <p class="lede">
+    Both AlphaFold and AlphaMissense rest on one idea: evolution has already run
+    the experiment, on a scale no laboratory could match.
+  </p>
+
+  <p>
+    Every protein you have exists in thousands of other species, each version
+    tweaked over hundreds of millions of years. If a position tolerates many
+    different amino acids across all of them, changing it is probably
+    survivable — organisms have been trying that for aeons and are still here.
+    If a position is identical in everything from humans to yeast, selection has
+    been ruthlessly deleting whatever changed it.
+  </p>
+
+  <div class="wide">
+  <figure>
+    <svg viewBox="0 0 860 300" role="img" aria-label="An alignment of the same protein across species. One column is identical in every species, indicating a change there is likely damaging; a neighbouring column varies freely, indicating a change there is likely tolerated.">
+      <g font-family="system-ui, sans-serif" font-size="12" fill="currentColor">
+        <text x="8" y="20" font-size="10.5" opacity="0.75">the same stretch of one protein, in five species</text>
+
+        <!-- highlight columns -->
+        <rect x="180" y="30" width="30" height="128" fill="currentColor" opacity="0.10"/>
+        <rect x="300" y="30" width="30" height="128" fill="currentColor" opacity="0.05"/>
+
+        <g font-family="ui-monospace, monospace" font-size="13">
+          <text x="8" y="52"  opacity="0.75" font-family="system-ui, sans-serif" font-size="11">human</text>
+          <text x="8" y="78"  opacity="0.75" font-family="system-ui, sans-serif" font-size="11">mouse</text>
+          <text x="8" y="104" opacity="0.75" font-family="system-ui, sans-serif" font-size="11">chicken</text>
+          <text x="8" y="130" opacity="0.75" font-family="system-ui, sans-serif" font-size="11">zebrafish</text>
+          <text x="8" y="156" opacity="0.75" font-family="system-ui, sans-serif" font-size="11">yeast</text>
+
+          <text x="90" y="52">L  V  <tspan font-weight="700">C</tspan>  G  <tspan opacity="0.8">S</tspan>  T  A  Q</text>
+          <text x="90" y="78">L  I  <tspan font-weight="700">C</tspan>  G  <tspan opacity="0.8">T</tspan>  T  A  Q</text>
+          <text x="90" y="104">M  V  <tspan font-weight="700">C</tspan>  G  <tspan opacity="0.8">N</tspan>  S  A  K</text>
+          <text x="90" y="130">L  V  <tspan font-weight="700">C</tspan>  A  <tspan opacity="0.8">D</tspan>  T  A  R</text>
+          <text x="90" y="156">I  L  <tspan font-weight="700">C</tspan>  G  <tspan opacity="0.8">P</tspan>  S  A  H</text>
+        </g>
+
+        <!-- callouts -->
+        <path d="M195 168 L 195 196" stroke="currentColor" stroke-width="1"/>
+        <path d="M315 168 L 315 232" stroke="currentColor" stroke-width="1" opacity="0.6"/>
+
+        <text x="150" y="214" font-size="11.5" font-weight="600">never changes in 1.5 billion years</text>
+        <text x="150" y="230" font-size="11" opacity="0.8">a substitution here is a red flag</text>
+
+        <text x="270" y="250" font-size="11.5" font-weight="600" opacity="0.85">changes freely</text>
+        <text x="270" y="266" font-size="11" opacity="0.75">a substitution here is probably tolerated</text>
+
+        <!-- second signal -->
+        <line x1="560" y1="30" x2="560" y2="270" stroke="currentColor"
+              stroke-width="1" opacity="0.25"/>
+        <text x="586" y="52" font-size="11.5" font-weight="600">a second signal: what moves together</text>
+        <text x="586" y="74" font-size="11" opacity="0.85">if a change at one position keeps being</text>
+        <text x="586" y="90" font-size="11" opacity="0.85">accompanied by a compensating change at</text>
+        <text x="586" y="106" font-size="11" opacity="0.85">another, the two are probably touching in 3D —</text>
+        <text x="586" y="122" font-size="11" opacity="0.85">even when they sit far apart in the sequence.</text>
+        <text x="586" y="150" font-size="11" opacity="0.85">Enough such constraints and the fold</text>
+        <text x="586" y="166" font-size="11" opacity="0.85">falls out. That is AlphaFold.</text>
+
+        <text x="586" y="200" font-size="11" opacity="0.85">Reading the same alignment for “how</text>
+        <text x="586" y="216" font-size="11" opacity="0.85">surprising is this letter here”, with the</text>
+        <text x="586" y="232" font-size="11" opacity="0.85">structure as context, is AlphaMissense.</text>
+      </g>
+    </svg>
+    <figcaption>
+      The conserved column on the left is doing structural or functional work —
+      selection has removed every organism that changed it. The variable column
+      is not. This single comparison, run across the whole proteome, is most of
+      where a pathogenicity score comes from.
+    </figcaption>
+  </figure>
+  </div>
+
+  <h3>From alignment to a number</h3>
+
+  <p>
+    AlphaMissense is built on AlphaFold’s architecture and starts from its
+    weights, then adds two things. First, a <strong>language model over
+    proteins</strong>: mask out an amino acid and learn to predict what belongs
+    there, given the surrounding sequence, the evolutionary alignment, and the
+    structural context AlphaFold provides. That yields a measure of surprise — a
+    mutation placing a highly improbable amino acid at a position is a red flag,
+    and the model knows whether that position is buried in the protein’s core, in
+    a binding site, or dangling on a loop.
+  </p>
+
+  <p>
+    Second, <strong>weak labels from human population data</strong>. Variants
+    common across human and primate populations stand in for “harmless”;
+    variants conspicuously absent stand in for “harmful”, on the reasoning that
+    selection has been quietly removing the bad ones. Note what is <em>not</em>
+    in that training signal: ClinVar’s clinical labels. That omission is what
+    makes comparing the two meaningful rather than circular — with one important
+    qualification in §11.
+  </p>
+
+  <h3>What pLDDT actually is</h3>
+
+  <p>
+    When AlphaFold predicts a structure it also predicts, for each residue, how
+    close its own answer is likely to be to the truth. That is
+    <span class="id">pLDDT</span>: above 90 is very high, 70 to 90 confident,
+    50 to 70 low, below 50 very low. It is the model’s own statement of doubt,
+    and the tool leans on it heavily — but not naively, for reasons that take up
+    the whole of §6.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 5 ── -->
+<section id="matrix">
+  <h2>The triage matrix</h2>
+
+  <p>
+    Two opinions arrive for each variant: what ClinVar’s curators concluded, and
+    what the model predicts. The matrix is the entire product — everything else
+    in the system exists to fill it in honestly or to render it.
+  </p>
+
+  <div class="wide">
+    <table class="matrix">
+      <caption class="note" style="text-align:left;padding-bottom:0.6rem">
+        Rows: what ClinVar says. Columns: what AlphaMissense predicts.
+      </caption>
+      <thead>
+        <tr>
+          <th></th>
+          <th>likely pathogenic</th>
+          <th>ambiguous</th>
+          <th>likely benign</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rowhead">uncertain / conflicting</td>
+          <td class="cell-act"><span class="outcome">reclass_upgrade</span>
+            <span class="note">the reason the tool exists</span></td>
+          <td class="cell-neut"><span class="outcome">remains_uncertain</span>
+            <span class="note">the model cannot help here</span></td>
+          <td class="cell-down"><span class="outcome">reclass_downgrade</span>
+            <span class="note">possible relief for a patient</span></td>
+        </tr>
+        <tr>
+          <td class="rowhead">pathogenic</td>
+          <td class="cell-ok"><span class="outcome">concordant</span>
+            <span class="note">model agrees with the curator</span></td>
+          <td class="cell-neut"><span class="outcome">model_uninformative</span></td>
+          <td class="cell-act"><span class="outcome">discordant</span>
+            <span class="note">model contradicts a clinical call</span></td>
+        </tr>
+        <tr>
+          <td class="rowhead">benign</td>
+          <td class="cell-act"><span class="outcome">discordant</span>
+            <span class="note">model contradicts a clinical call</span></td>
+          <td class="cell-neut"><span class="outcome">model_uninformative</span></td>
+          <td class="cell-ok"><span class="outcome">concordant</span></td>
+        </tr>
+        <tr>
+          <td class="rowhead">no assertion</td>
+          <td class="cell-act"><span class="outcome">novel_candidate</span>
+            <span class="note">ClinVar has never seen it</span></td>
+          <td class="cell-neut"><span class="outcome">unasserted</span></td>
+          <td class="cell-neut"><span class="outcome">unasserted</span></td>
+        </tr>
+        <tr>
+          <td class="rowhead">other axis</td>
+          <td class="cell-ok" colspan="3"><span class="outcome">not_triaged</span>
+            <span class="note">ClinVar’s claim is about drug response or risk
+            modification, not pathogenicity — a different question entirely</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:1.4rem">
+    <span class="swatch" style="background:var(--pathogenic)"></span>Needs a human ·
+    <span class="swatch" style="background:var(--benign)"></span>Possible downgrade ·
+    <span class="swatch" style="background:var(--ambiguous)"></span>No signal
+  </p>
+
+  <p>
+    The matrix is built by taking every combination of the two vocabularies, so
+    a pair cannot silently fall through to a default. A test asserts that
+    completeness — which is how the last two rows came to exist at all. Both
+    were missing from the original design and only surfaced when the data was
+    examined rather than assumed.
+  </p>
+
+  <div class="callout warn">
+    <p>
+      <strong>An asymmetry worth knowing.</strong> Upgrade candidates cluster on
+      residues with solid structural evidence; downgrades cluster in
+      poorly-resolved, disordered regions — because that is where benign
+      variation lives. A downgrade is therefore <em>structurally less
+      supportable</em> than an upgrade, and the interface must not present the
+      two with equal weight.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 6 ── -->
+<section id="confidence">
+  <h2>Structural confidence</h2>
+
+  <p class="lede">
+    The first design of this tool gated everything on pLDDT: trust the
+    structural reading above 70, distrust it below. That was wrong, and the
+    variant that proved it is the most consequential one in the dataset.
+  </p>
+
+  <p>
+    <span class="id">EGFR L858R</span> is the classic activating mutation in
+    non-small-cell lung cancer — the mutation that a whole generation of
+    targeted therapies was built around. Its pLDDT is <strong>51.2</strong>.
+    A pLDDT-only gate would have quietly demoted it.
+  </p>
+
+  <p>
+    AlphaFold is unconfident there for a real reason: L858 sits in the kinase
+    activation loop, a stretch that genuinely moves. Low confidence was not
+    failure, it was an accurate report about a flexible region. And that same
+    region has been crystallised many times over, because it is exactly where
+    drugs bind.
+  </p>
+
+  <div class="wide">
+  <figure>
+    <svg viewBox="0 0 900 300" role="img" aria-label="A plot of AlphaFold confidence along the EGFR protein, with bands beneath marking regions determined experimentally. Residue 858 sits in a confidence dip that is nonetheless covered by experimental structures.">
+      <g font-family="system-ui, sans-serif" font-size="11" fill="currentColor">
+
+        <!-- axes -->
+        <line x1="70" y1="180" x2="870" y2="180" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+        <text x="8" y="66" font-size="10.5" opacity="0.75">pLDDT</text>
+        <text x="46" y="64" font-size="10" opacity="0.6" text-anchor="end">100</text>
+        <text x="46" y="184" font-size="10" opacity="0.6" text-anchor="end">0</text>
+
+        <!-- confidence cut -->
+        <line x1="70" y1="96" x2="870" y2="96" stroke="currentColor"
+              stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+        <text x="874" y="99" font-size="10" opacity="0.7">70</text>
+
+        <!-- pLDDT trace -->
+        <polyline fill="none" stroke="currentColor" stroke-width="1.8"
+          points="70.7,144 86.5,78 169.2,69.6 334.5,72 497.2,74.4 506.4,126 526.3,108 532.9,69.6 592.4,67.2 635.4,105.6 637.4,118.8 645.3,108 665.1,68.4 737.8,74.4 751.1,132 797.4,146.4 870,150"/>
+
+        <!-- experimental coverage -->
+        <text x="8" y="212" font-size="10.5" opacity="0.75">solved</text>
+        <rect x="86.5"  y="200" width="410.7" height="15" rx="2" fill="currentColor" opacity="0.28"/>
+        <rect x="529.6" y="200" width="216.2" height="15" rx="2" fill="currentColor" opacity="0.28"/>
+        <text x="180" y="211" font-size="10" opacity="0.95">ectodomain · 1IVO</text>
+        <text x="560" y="211" font-size="10" opacity="0.95">kinase domain · 1M14</text>
+
+        <!-- L858 marker -->
+        <line x1="637.4" y1="52" x2="637.4" y2="222" stroke="currentColor"
+              stroke-width="1.4"/>
+        <circle cx="637.4" cy="118.8" r="4" fill="currentColor"/>
+        <text x="646" y="48" font-size="11.5" font-weight="700">L858R</text>
+        <text x="646" y="63" font-size="10.5" opacity="0.85">pLDDT 51.2 — below the cut</text>
+        <text x="646" y="78" font-size="10.5" opacity="0.85">but inside a solved region</text>
+
+        <!-- x labels -->
+        <g font-size="10" opacity="0.6" text-anchor="middle">
+          <text x="86.5"  y="240">25</text>
+          <text x="334.5" y="240">400</text>
+          <text x="497.2" y="240">646</text>
+          <text x="745.8" y="240">1022</text>
+          <text x="870"   y="240">1210</text>
+        </g>
+        <text x="470" y="262" font-size="10.5" opacity="0.7" text-anchor="middle">residue position along EGFR</text>
+
+        <text x="770" y="150" font-size="10.5" opacity="0.75">C-terminal tail:</text>
+        <text x="770" y="164" font-size="10.5" opacity="0.75">unconfident</text>
+        <text x="770" y="178" font-size="10.5" opacity="0.75">and unsolved</text>
+      </g>
+    </svg>
+    <figcaption>
+      Two independent signals, deliberately kept apart. The line is what the
+      prediction thinks of itself; the bands are what laboratories have actually
+      determined. They disagree at residue 858 — and where they disagree, the
+      experiment wins.
+    </figcaption>
+  </figure>
+  </div>
+
+  <p>So the binary gate became three ordered tiers:</p>
+
+  <div class="wide">
+    <table>
+      <thead>
+        <tr><th>Tier</th><th>Meaning</th><th>How it is decided</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="swatch" style="background:var(--tier-1)"></span>experimentally solved</td>
+          <td>A laboratory has physically determined this residue’s position.</td>
+          <td>The residue falls inside a span some PDB entry resolved.</td>
+        </tr>
+        <tr>
+          <td><span class="swatch" style="background:var(--tier-2)"></span>confidently predicted</td>
+          <td>No experiment, but AlphaFold is sure of itself here.</td>
+          <td>pLDDT ≥ 70 and no experimental coverage.</td>
+        </tr>
+        <tr>
+          <td><span class="swatch" style="background:var(--tier-3)"></span>predicted, unreliable</td>
+          <td>A guess about terrain the model itself doubts.</td>
+          <td>pLDDT &lt; 70 and no experimental coverage.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Experimental coverage <strong>overrides</strong> pLDDT rather than being
+    averaged with it. A solved residue is solved regardless of what the
+    prediction thought.
+  </p>
+
+  <h3>A second thing this corrected</h3>
+
+  <p>
+    The tiers also overturned an assumption about BRCA1. Only
+    <strong>17.6%</strong> of that protein has ever been solved — it is largely
+    disordered, and the original expectation was that the structural layer would
+    be useless for it. In fact <strong>73% of its reclassification candidates
+    sit on solved residues</strong>, because pathogenic missense variation
+    clusters in the folded domains where function lives, and those are exactly
+    the parts that crystallise.
+  </p>
+
+  <p>
+    The lesson generalises: a protein’s <em>average</em> confidence is the wrong
+    statistic. What matters is the confidence at the specific residues you are
+    making claims about.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 7 ── -->
+<section id="priority">
+  <h2>Building a worklist</h2>
+
+  <p>
+    Around 30% of predictions land in an actionable class — far too many to
+    review. Priority narrows that to a queue a curator could actually work
+    through, using rules rather than a score.
+  </p>
+
+  <p>A variant reaches <strong>high</strong> priority only when all three hold:</p>
+
+  <ul>
+    <li>it sits on an <strong>experimentally solved</strong> residue;</li>
+    <li>ClinVar’s assertion carries <strong>two stars or more</strong> — more
+      than one submitter stands behind it;</li>
+    <li>the model’s score is near a rail (≥ 0.9 or ≤ 0.1), not merely over the
+      line.</li>
+  </ul>
+
+  <p>
+    This is deliberately not a weighted composite. A single number cannot be
+    argued with and hides which evidence carried it; a curator asking “why is
+    this at the top of my queue?” gets the actual reasons back, because each
+    variant carries them.
+  </p>
+
+  <p>
+    Applied to four genes, that takes 7,834 actionable variants down to
+    <strong>462 at high priority</strong>.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 8 ── -->
+<section id="dossier">
+  <h2>The second question</h2>
+
+  <p>
+    Knowing a gene carries damaging variants raises an obvious follow-up: could
+    it be drugged? The dossier answers that from the same ontology, across five
+    banded dimensions — genetic evidence, structural readiness, binding site,
+    chemical matter, and variant burden — and derives a readable archetype
+    rather than a score.
+  </p>
+
+  <div class="wide">
+    <table>
+      <thead>
+        <tr><th>Gene</th><th>Genetic</th><th>Pocket</th><th class="num">Drugs</th><th>Archetype</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="id">EGFR</span></td><td>strong</td><td>yes</td>
+          <td class="num">82</td><td>validated druggable target</td>
+        </tr>
+        <tr>
+          <td><span class="id">TP53</span></td><td>strong</td><td>no</td>
+          <td class="num">9</td><td>genetically validated, clinically emerging</td>
+        </tr>
+        <tr>
+          <td><span class="id">BRCA1</span></td><td>strong</td><td>no</td>
+          <td class="num">0</td><td>genetically validated, chemically unexplored</td>
+        </tr>
+        <tr>
+          <td><span class="id">PTEN</span></td><td>strong</td><td>no</td>
+          <td class="num">0</td><td>genetically validated, chemically unexplored</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    BRCA1 is the instructive row. The genetic evidence tying it to breast cancer
+    is about as strong as biology gets — and it has no pocket, no ligand and no
+    drugs. That is not a gap in the data; it is the real state of the world for
+    a tumour suppressor, where the therapeutic strategy has to be indirect.
+    A tool that quietly hid the empty column would be lying by omission.
+  </p>
+
+  <p>
+    Every one of BRCA1’s twenty experimental structures covers only residues
+    1646–1859 — the BRCT domain. That single column <em>is</em> the 17.6%
+    solved figure from §6, visible directly.
+  </p>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── 9 ── -->
+<section id="architecture">
+  <h2>How it is built</h2>
+
+  <p>
+    An ontology in DuckDB, a pure rules layer over it, and a static site
+    generated from both. A handful of decisions did most of the work.
+  </p>
+
+  <h3>Objects, not one wide table</h3>
+
+  <p>
+    A genomic variant, a per-transcript prediction and a clinical assertion are
+    three different facts from three sources with three refresh cadences. They
+    are three tables, joined by explicit edges. Flattening them would have
+    destroyed the distinction the product depends on — and the data insisted on
+    it: ClinVar reports consequences aggregated across <em>all</em> transcripts
+    (48 of them for BRCA1), so one variant can be harmless on the canonical
+    transcript and a missense change on another.
+  </p>
+
+  <h3>Provenance is a column, not a comment</h3>
+
+  <p>
+    Every row points at the retrieval that produced it — source, URL, version,
+    timestamp, payload hash. Any number in the interface can be traced back to
+    the request that fetched it.
+  </p>
+
+  <h3>No bulk downloads</h3>
+
+  <p>
+    NCBI serves the 193 MB ClinVar archive at roughly 101 KB/s, and opening more
+    connections does not help. But the file is block-compressed with an index,
+    and the server honours byte ranges — so the tool reads the index, works out
+    which bytes cover the gene, and fetches only those. Four genes:
+    <strong>about 1.5 MB and 30 seconds</strong>, instead of 193 MB and half an
+    hour.
+  </p>
+
+  <h3>One place per threshold</h3>
+
+  <p>
+    The pLDDT cut of 70 and AlphaMissense’s 0.34 / 0.564 class boundaries exist
+    in exactly one place each, in Python. The browser receives decided classes
+    as integer codes and never re-derives a boundary. An earlier version had the
+    browser recomputing them — two implementations of the same science in two
+    languages, which is a disagreement waiting to happen.
+  </p>
+
+  <h3>The rules touch nothing</h3>
+
+  <p>
+    The rules layer imports no database, no HTTP client and no interface code,
+    and an automated check enforces it. That is what allowed the entire frontend
+    to be replaced — a Streamlit application swapped for a static site — without
+    one rule changing, and with the test suite still passing throughout.
+  </p>
+</section>
+
+<!-- ────────────────────────────────────────────────────────── 10 ── -->
+<section id="governance">
+  <h2>Decisions and the record</h2>
+
+  <p>
+    When a reviewer reaches a conclusion, that judgement becomes data, and it is
+    held to the same standards as everything else.
+  </p>
+
+  <ul>
+    <li>
+      <strong>Append and supersede, never overwrite.</strong> Revising a
+      decision writes a new record and marks the old one superseded. Both stay
+      on the record, and the earlier rationale is never edited.
+    </li>
+    <li>
+      <strong>No decision without a rationale.</strong> An empty justification
+      is refused outright — a conclusion nobody can review is not a conclusion.
+    </li>
+    <li>
+      <strong>Blocked actions explain themselves.</strong> A control that
+      refuses names the reason: this variant’s class is not reviewable, or this
+      dossier rests on too few sources.
+    </li>
+    <li>
+      <strong>Decisions record the data build they were made against.</strong>
+      If ClinVar or AlphaMissense is refreshed underneath, earlier judgements
+      are flagged as stale rather than presented as current.
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <p>
+      <strong>Stated plainly in the interface, not just here:</strong> the log
+      lives in browser storage. It records who <em>claims</em> to have decided
+      what. That is attribution, not authentication, and it is not tamper-proof.
+      Exporting the log is what makes it durable.
+    </p>
+  </div>
+</section>
+
+<!-- ────────────────────────────────────────────────────────── 11 ── -->
+<section id="limits">
+  <h2>What it does not do</h2>
+
+  <h3>Agreement with ClinVar is not independent validation</h3>
+
+  <p>
+    Where ClinVar is confident, the model agrees about 95% of the time on
+    pathogenic calls and 87% on benign ones. That sounds like validation. It is
+    not — or not entirely. AlphaMissense’s class thresholds were themselves
+    chosen to hit roughly 90% precision <em>on ClinVar</em>. Some of the
+    agreement is therefore true by construction.
+  </p>
+
+  <p>
+    The defensible claim is narrower and still useful: the model behaves on
+    these genes as its published calibration predicts, so its scores can be used
+    to prioritise uncertain variants for expert attention. The tool must never
+    claim to have validated AlphaMissense, and this manual will not either.
+  </p>
+
+  <h3>Molecular effect is not clinical outcome</h3>
+
+  <p>
+    The model predicts whether a mutation breaks a protein. Whether a broken
+    protein makes a particular person ill depends on penetrance, the other copy
+    of the gene, tissue context, modifier genes and environment — none of which
+    is modelled anywhere in this system. That gap is exactly why the output is a
+    queue for experts rather than a verdict.
+  </p>
+
+  <h3>Coverage</h3>
+
+  <ul>
+    <li>Single-letter protein-coding changes only — no insertions, deletions,
+      splice-site or regulatory variants.</li>
+    <li>The canonical transcript only, because that is all AlphaMissense
+      publishes. Variants that are missense on some other transcript appear as
+      having no prediction, which is honest rather than silent.</li>
+    <li>Four genes are loaded, of eight planned.</li>
+    <li>Proteins longer than about 2,700 residues will fail loudly on import —
+      AlphaFold splits those into fragments and the schema assumes one. The
+      constraint was written to break rather than silently drop rows.</li>
+  </ul>
+
+  <h3>Licensing</h3>
+
+  <p>
+    AlphaMissense data is <span class="id">CC BY-NC-SA 4.0</span>:
+    non-commercial, attribution required, and share-alike travels with any
+    derivative of the data. Research and portfolio use are fine; a commercial
+    product is not.
+  </p>
+</section>
+
+<!-- ────────────────────────────────────────────────────────── 12 ── -->
+<section id="running">
+  <h2>Running it</h2>
+
+  <p>No GPU, no API keys, no accounts.</p>
+
+<pre><code>uv run python ingest.py          # build the ontology from public sources (~3 min)
+uv run python export_site.py     # generate the static site
+uv run python serve.py           # http://localhost:8080</code></pre>
+
+  <p>And to check that it still tells the truth:</p>
+
+<pre><code>uv run --with pytest pytest -q                                   # core rules, schema, integration
+node --test tests/decisions.test.mjs tests/view-model.test.mjs   # governance and view-model rules
+uv run python audit_site.py                                      # every displayed number, re-derived</code></pre>
+
+  <p>
+    That last one exists because an exported site is a second copy of the truth,
+    and a second copy can drift. It recomputes every headline figure straight
+    from the database and fails if the site disagrees.
+  </p>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <p>
+      Built on public data:
+      <a href="https://alphafold.ebi.ac.uk">AlphaFold DB</a> and AlphaMissense
+      (EMBL-EBI &amp; Google DeepMind) ·
+      <a href="https://www.ncbi.nlm.nih.gov/clinvar/">ClinVar</a> (NCBI) ·
+      <a href="https://platform.opentargets.org">Open Targets</a> ·
+      <a href="https://www.rcsb.org">RCSB PDB</a>.
+    </p>
+    <p>
+      AlphaMissense data is CC BY-NC-SA 4.0 — non-commercial use only. This tool
+      surfaces candidates for expert review; it does not assert clinical
+      classifications.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -78,6 +78,13 @@ html, body {
 
 .spacer { flex: 1; }
 .stamp { color: var(--muted); font-size: 0.7rem; }
+.manual-link {
+  color: var(--ink-2); font-size: 0.8rem; text-decoration: none;
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 0.32rem 0.75rem; margin-right: 1.1rem;
+}
+.manual-link:hover { background: var(--surface-2); color: var(--ink);
+                     text-decoration: none; }
 
 main { padding: 1rem 1.25rem 3rem; }
 .view[hidden] { display: none; }
