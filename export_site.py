@@ -39,6 +39,18 @@ VENDOR = SITE / "vendor"
 MOL3D_URL = "https://unpkg.com/3dmol@2.4.2/build/3Dmol-min.js"
 
 
+def write(path: Path, text: str) -> None:
+    """Write a payload with LF endings on every platform.
+
+    `Path.write_text` uses the platform default, so a Windows export emits CRLF
+    and a Linux one emits LF — byte-different payloads from identical inputs,
+    for no reason. The PDB files are the ones that matter: their records are
+    parsed by fixed column positions, so a stray CR rides along in the last
+    field of every atom.
+    """
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
 def _round(series, places: int):
     return [None if pd.isna(v) else round(float(v), places) for v in series]
 
@@ -181,18 +193,18 @@ def main() -> None:
         # JSON and which the browser rejects for the whole file. Fail here
         # instead of shipping a payload that cannot be parsed.
         dump = dict(separators=(",", ":"), allow_nan=False)
-        (DATA / f"variants_{symbol}.json").write_text(
+        write(DATA / f"variants_{symbol}.json",
             json.dumps(build_variants(triaged), **dump))
-        (DATA / f"profile_{symbol}.json").write_text(
+        write(DATA / f"profile_{symbol}.json",
             json.dumps(build_profile(prof), **dump))
-        (DATA / f"dossier_{symbol}.json").write_text(
+        write(DATA / f"dossier_{symbol}.json",
             json.dumps(build_dossier(con, symbol, acc, facts.to_dict(), triaged),
                        default=str, **dump))
 
         # Backbone only: a cartoon needs nothing else, and it is ~35% smaller.
         pdb = S.backbone_only(S.fetch_structure(struct["file_url"],
                                                 struct["structure_id"]))
-        (DATA / f"{struct['structure_id']}.pdb").write_text(pdb)
+        write(DATA / f"{struct['structure_id']}.pdb", pdb)
 
         actionable = triaged[triaged.triage_class.isin(T.ACTIONABLE)]
         manifest["targets"].append({
@@ -210,7 +222,7 @@ def main() -> None:
             },
         })
 
-    (DATA / "manifest.json").write_text(json.dumps(manifest, indent=1))
+    write(DATA / "manifest.json", json.dumps(manifest, indent=1, allow_nan=False))
 
     vendor_js = VENDOR / "3Dmol-min.js"
     if not vendor_js.exists():
