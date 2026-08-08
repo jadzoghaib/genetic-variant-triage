@@ -1,0 +1,17 @@
+# Generated payloads must survive a checkout byte-identical to what
+# export_site.py wrote. On Windows, autocrlf would rewrite line endings inside
+# the .pdb files, and 3Dmol parses PDB records by fixed column positions on
+# each line — a stray CR lands inside the last field of every atom record.
+site/data/**   -text
+site/vendor/** -text
+
+# Source keeps LF in the repository regardless of the checkout platform.
+*.py       text eol=lf
+*.js       text eol=lf
+*.mjs      text eol=lf
+*.css      text eol=lf
+*.html     text eol=lf
+*.sql      text eol=lf
+*.md       text eol=lf
+*.toml     text eol=lf
+*.json     text eol=lf

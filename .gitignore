@@ -1,0 +1,30 @@
+# The store is rebuilt by `uv run python ingest.py` from public sources. It is
+# ~40 MB and changes on every refresh of ClinVar, so it is regenerated, never
+# committed.
+locus.duckdb
+locus.duckdb.*
+phase0_scratch.duckdb
+
+# Cached upstream downloads (AlphaFold entries, AlphaMissense CSVs, raw PDBs).
+# Regenerated on demand by ingest.py.
+#
+# The leading slash is load-bearing: a bare `data/` matches a directory of that
+# name at ANY depth, which silently swallowed site/data/ — the payloads the
+# deployed site is built from.
+/data/
+
+# site/data/ and site/vendor/ are deliberately NOT ignored. They are generated,
+# but GitHub Pages serves straight from the repository, so committing them is
+# what makes this deployable without a build step. They total ~3.8 MB.
+# See the licensing note in README.md before publishing site/data/ publicly.
+
+# Exported decision logs may contain analyst names and rationales.
+locus-decisions-*.json
+
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+node_modules/
+.DS_Store
+Thumbs.db

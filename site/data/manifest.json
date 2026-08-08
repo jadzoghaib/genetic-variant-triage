@@ -1,0 +1,61 @@
+{
+ "generated_at": "2026-08-08T20:01:40+00:00",
+ "targets": [
+  {
+   "symbol": "BRCA1",
+   "acc": "P38398",
+   "name": "BRCA1 DNA repair associated",
+   "structure_id": "AF-P38398-F1",
+   "kpi": {
+    "predictions": 12463,
+    "actionable": 4394,
+    "high": 59,
+    "upgrades": 352,
+    "pct_solved": 17.6,
+    "global_plddt": 41.6
+   }
+  },
+  {
+   "symbol": "EGFR",
+   "acc": "P00533",
+   "name": "epidermal growth factor receptor",
+   "structure_id": "AF-P00533-F1",
+   "kpi": {
+    "predictions": 8041,
+    "actionable": 1655,
+    "high": 172,
+    "upgrades": 583,
+    "pct_solved": 87.4,
+    "global_plddt": 75.9
+   }
+  },
+  {
+   "symbol": "PTEN",
+   "acc": "P60484",
+   "name": "phosphatase and tensin homolog",
+   "structure_id": "AF-P60484-F1",
+   "kpi": {
+    "predictions": 2714,
+    "actionable": 813,
+    "high": 124,
+    "upgrades": 529,
+    "pct_solved": 100.0,
+    "global_plddt": 83.0
+   }
+  },
+  {
+   "symbol": "TP53",
+   "acc": "P04637",
+   "name": "tumor protein p53",
+   "structure_id": "AF-P04637-F1",
+   "kpi": {
+    "predictions": 2569,
+    "actionable": 972,
+    "high": 107,
+    "upgrades": 427,
+    "pct_solved": 100.0,
+    "global_plddt": 75.1
+   }
+  }
+ ]
+}

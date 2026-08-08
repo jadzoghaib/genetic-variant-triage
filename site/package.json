@@ -1,0 +1,6 @@
+{
+  "name": "locus-site",
+  "private": true,
+  "type": "module",
+  "description": "Declares the site's .js files as ES modules. Not a build step — the site has no build, no bundler and no dependencies; this only stops Node from re-parsing decisions.js as CommonJS when the tests import it."
+}

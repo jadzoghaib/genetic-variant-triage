@@ -1,0 +1,16 @@
+[project]
+name = "locus"
+version = "0.1.0"
+description = "Target & Variant Intelligence Console"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "duckdb>=1.1",
+    "streamlit>=1.61.1",
+    "py3dmol>=2.5.5",
+    "altair>=6.2.2",
+]
+
+[tool.uv]
+package = false

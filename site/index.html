@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locus — target &amp; variant intelligence console</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="topbar">
+  <div class="brand">LOCUS<span>target &amp; variant intelligence</span></div>
+  <div class="seg" id="targets" role="group" aria-label="Target"></div>
+  <div class="seg" id="views" role="group" aria-label="View">
+    <button data-view="console" aria-pressed="true">Variant console</button>
+    <button data-view="dossier" aria-pressed="false">Target dossier</button>
+    <button data-view="audit" aria-pressed="false">Audit log <span id="audit-n"></span></button>
+  </div>
+  <div class="spacer"></div>
+  <div class="stamp" id="stamp"></div>
+</div>
+
+<main id="main">
+  <!-- ── variant console ───────────────────────────────────────────── -->
+  <section class="view" id="view-console">
+    <div class="eyebrow">Variant triage console</div>
+    <h1 id="c-title">—</h1>
+    <div class="sub" id="c-sub"></div>
+
+    <div class="kpi" id="kpi"></div>
+
+    <div class="filters">
+      <label><input type="checkbox" id="f-actionable" checked> Actionable only</label>
+      <span><label for="f-priority">Min priority</label>
+        <select id="f-priority">
+          <option value="">any</option>
+          <option value="low">low+</option>
+          <option value="medium" selected>medium+</option>
+          <option value="high">high</option>
+        </select></span>
+      <span><label for="f-tier">Structure</label>
+        <select id="f-tier"><option value="">any</option></select></span>
+      <span><label for="f-stars">Min ★</label>
+        <input type="range" id="f-stars" min="0" max="4" value="0" step="1">
+        <span id="f-stars-v" class="num">0</span></span>
+      <span><label for="f-search">Find</label>
+        <input type="text" id="f-search" placeholder="e.g. L858R"></span>
+      <span class="stamp" id="f-note"></span>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <div class="panel-h"><span id="wl-scope">Worklist</span>
+                             <span id="wl-cap"></span></div>
+        <div class="tablewrap" id="wl-wrap"><table id="worklist" role="grid"
+             aria-label="Variant worklist">
+          <thead><tr>
+            <th>Variant</th><th>Triage</th><th>Priority</th><th>ClinVar</th>
+            <th class="num">★</th><th class="num">AlphaMissense</th>
+            <th class="num">pLDDT</th><th>Structure</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <p class="sr-only" role="status" id="wl-live"></p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span>Detail</span></div>
+        <div id="detail" class="empty">
+          Select a variant to see its residue, its structural evidence, and the
+          retrieval that produced every field.
+        </div>
+      </div>
+    </div>
+
+    <div class="eyebrow" id="struct-h">Structure</div>
+    <div class="mols" id="mols">
+      <div class="panel">
+        <div class="panel-h"><span>Predicted effect — most damaging substitution per residue</span></div>
+        <div class="legend" id="legend-am"></div>
+        <div class="mol" id="mol-am"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><span>Structural evidence — how much weight that reading can bear</span></div>
+        <div class="legend" id="legend-tier"></div>
+        <div class="mol" id="mol-tier"></div>
+      </div>
+    </div>
+
+    <div class="eyebrow">Sequence profile</div>
+    <div class="panel" style="padding:0.6rem 0.8rem">
+      <div id="profile"></div>
+      <div class="legend" id="legend-profile"></div>
+    </div>
+  </section>
+
+  <!-- ── target dossier ────────────────────────────────────────────── -->
+  <section class="view" id="view-dossier" hidden>
+    <div class="eyebrow">Target dossier</div>
+    <h1 id="d-title">—</h1>
+    <div class="sub" id="d-sub"></div>
+    <div class="archetype" id="d-archetype"></div>
+
+    <div class="cards" id="d-cards"></div>
+
+    <div class="two" style="margin-top:0.9rem">
+      <div class="panel">
+        <div class="panel-h"><span>Disease associations</span>
+                             <span id="d-assoc-n"></span></div>
+        <div class="tablewrap" style="max-height:340px"><table id="d-assoc">
+          <thead><tr><th>Disease</th><th class="num">overall</th>
+            <th class="num">genetic</th><th class="num">literature</th>
+            <th class="num">known drug</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span>Chemical matter &amp; clinical activity</span>
+                             <span id="d-drugs-n"></span></div>
+        <div class="tablewrap" style="max-height:340px"><table id="d-drugs">
+          <thead><tr><th>Drug</th><th>Type</th><th>Stage</th>
+            <th class="num">trials</th><th>Mechanism</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="eyebrow">Experimental structures</div>
+    <div class="panel">
+      <div class="tablewrap" style="max-height:300px"><table id="d-struct">
+        <thead><tr><th>Entity</th><th>Method</th><th class="num">resolution&nbsp;Å</th>
+          <th class="num">covers</th><th>Title</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="eyebrow">Governed action</div>
+    <div class="panel"><div id="d-action" class="actions"></div></div>
+  </section>
+
+  <!-- ── audit log ─────────────────────────────────────────────────── -->
+  <section class="view" id="view-audit" hidden>
+    <div class="eyebrow">Audit log</div>
+    <h1>Decision record</h1>
+    <div class="sub">Append-only. A decision is never edited or deleted — a new
+      one supersedes it, and both remain on the record.</div>
+
+    <div class="warn" id="audit-warn"></div>
+
+    <div class="filters">
+      <span><label for="analyst">Analyst</label>
+        <input type="text" id="analyst" placeholder="your name"></span>
+      <button class="btn" id="a-export">Export decision log</button>
+      <label class="btn" for="a-import-file">Import…</label>
+      <input type="file" id="a-import-file" accept="application/json" hidden>
+      <button class="btn danger" id="a-clear">Clear local log</button>
+      <span class="stamp" id="a-count"></span>
+    </div>
+
+    <div class="panel" style="margin-top:0.75rem">
+      <div class="tablewrap" style="max-height:520px"><table id="audit">
+        <thead><tr><th>When</th><th>Analyst</th><th>Object</th><th>Target</th>
+          <th>Outcome</th><th>Was</th><th>Rationale</th><th>State</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  AlphaMissense data is CC BY-NC-SA 4.0 — non-commercial use only.
+  Locus surfaces candidates for expert review; it does not assert clinical
+  classifications. AlphaMissense's class thresholds were themselves calibrated
+  on ClinVar, so agreement with ClinVar is consistent with published
+  calibration rather than independent validation of it.
+  <br><br>
+  Decisions are held in this browser's local storage. That records who
+  <em>claims</em> to have decided what — attribution, not authentication — and
+  it is not tamper-proof. Export the log to keep a durable copy;
+  <code>import_decisions.py</code> loads an exported log back into the ontology.
+  <br><br>
+  Built from public data:
+  <a href="https://alphafold.ebi.ac.uk" target="_blank" rel="noopener">AlphaFold DB</a>
+  and AlphaMissense (EMBL-EBI &amp; Google DeepMind) ·
+  <a href="https://www.ncbi.nlm.nih.gov/clinvar/" target="_blank" rel="noopener">ClinVar</a> (NCBI) ·
+  <a href="https://platform.opentargets.org" target="_blank" rel="noopener">Open Targets</a> ·
+  <a href="https://www.rcsb.org" target="_blank" rel="noopener">RCSB PDB</a> ·
+  structures rendered with
+  <a href="https://3dmol.csb.pitt.edu" target="_blank" rel="noopener">3Dmol.js</a>.
+</footer>
+
+<script src="vendor/3Dmol-min.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
