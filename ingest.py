@@ -127,7 +127,8 @@ def ingest_variants(con, symbol: str, acc: str) -> dict:
 
     chrom, beg, end = am["chrom"].iloc[0], int(am["pos"].min()), int(am["pos"].max())
     cvdf, raw, url = cv.fetch_gene(_CV_INDEX, symbol, chrom, beg, end)
-    ev_cv = db.record_evidence(con, cv.SOURCE, url, raw, record_count=len(cvdf))
+    ev_cv = db.record_evidence(con, cv.SOURCE, url, raw, record_count=len(cvdf),
+                               source_version=_CV_INDEX.last_modified)
     stats["clinvar_records"] = len(cvdf)
 
     known = set(am_variants["variant_id"])
@@ -166,7 +167,7 @@ def ingest_dossier(con, symbol: str, acc: str, ensembl_id: str) -> dict:
     stats: dict[str, int] = {}
 
     t, raw, url = ot.fetch(ensembl_id, acc)
-    ev_ot = db.record_evidence(con, ot.SOURCE, url, raw)
+    ev_ot = db.record_evidence(con, ot.SOURCE, url, raw, source_version=_OT_RELEASE)
     rec = ot.flatten(t, acc)
 
     con.execute(
@@ -269,15 +270,19 @@ def ingest_dossier(con, symbol: str, acc: str, ensembl_id: str) -> dict:
 # ────────────────────────────────────────────────────────────────── main ──
 
 _CV_INDEX = None
+_OT_RELEASE = None
 
 
 def main() -> None:
-    global _CV_INDEX
+    global _CV_INDEX, _OT_RELEASE
     con = db.connect()
     db.init_schema(con)
 
     print("loading ClinVar tabix index...")
     _CV_INDEX = cv.load_index()
+    _OT_RELEASE = ot.release()
+    print(f"  ClinVar archive     {_CV_INDEX.last_modified}")
+    print(f"  Open Targets release {_OT_RELEASE}")
 
     rows = []
     for symbol, (acc, ensembl_id) in GENES.items():

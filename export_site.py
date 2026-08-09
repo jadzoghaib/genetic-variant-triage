@@ -176,8 +176,22 @@ def main() -> None:
     con = queries.connect()
     facts_df = queries.target_facts(con).set_index("symbol")
 
+    # "Last updated" is two different questions: when this build ran, and how
+    # current the evidence behind it is. A build date alone can look fresh while
+    # resting on a months-old release, so both travel with the payload.
+    src = {r[0]: r[1] for r in con.execute("""
+        SELECT source_system, ARG_MAX(source_version, retrieved_at)
+        FROM evidence WHERE source_version IS NOT NULL
+        GROUP BY source_system
+    """).fetchall()}
+
     manifest = {
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "sources": {
+            "clinvar_release": src.get("clinvar"),
+            "opentargets_release": src.get("open_targets"),
+            "alphafold_model": src.get("alphafold_db"),
+        },
         "targets": [],
     }
 

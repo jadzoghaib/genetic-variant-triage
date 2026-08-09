@@ -42,6 +42,10 @@ class TabixIndex:
 
     linear: dict[str, tuple[int, ...]]
     file_size: int
+    #: The archive's own Last-Modified. ClinVar publishes weekly, and this is
+    #: the honest answer to "how current is the clinical evidence" — the fetch
+    #: time only says when we asked.
+    last_modified: str | None = None
 
     def byte_range(self, chrom: str, beg: int, end: int, pad_windows: int = 2) -> tuple[int, int]:
         """Compressed byte range [start, stop) covering the region.
@@ -92,8 +96,12 @@ def load_index(url: str = CLINVAR_TBI, vcf_url: str = CLINVAR_VCF) -> TabixIndex
         linear[names[i]] = struct.unpack_from(f"<{n_intv}Q", raw, off)
         off += n_intv * 8
 
-    size = int(httpx.head(vcf_url, timeout=60).headers["content-length"])
-    return TabixIndex(linear=linear, file_size=size)
+    head = httpx.head(vcf_url, timeout=60)
+    return TabixIndex(
+        linear=linear,
+        file_size=int(head.headers["content-length"]),
+        last_modified=head.headers.get("last-modified"),
+    )
 
 
 def _bgzf_decompress(data: bytes) -> bytes:

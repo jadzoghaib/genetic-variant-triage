@@ -60,6 +60,21 @@ query Dossier($id: String!, $size: Int!) {
 """
 
 
+def release() -> str | None:
+    """The Open Targets data release this build drew on, e.g. "26.06".
+
+    Association scores and drug lists move between releases, so "which release"
+    is a more useful statement of currency than the moment we happened to ask.
+    """
+    try:
+        r = httpx.post(API, json={"query": "{ meta { dataVersion { year month } } }"},
+                       timeout=60)
+        v = r.json()["data"]["meta"]["dataVersion"]
+        return f"{v['year']}.{v['month']}"
+    except Exception:
+        return None          # a missing version label must not fail an ingest
+
+
 def fetch(ensembl_id: str, uniprot_acc: str) -> tuple[dict, bytes, str]:
     """Fetch a target dossier and verify it is the target we asked for.
 

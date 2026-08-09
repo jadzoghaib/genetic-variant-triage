@@ -576,8 +576,18 @@ async function init() {
   DEC.load();
   manifest = await load('manifest.json');
   state.target = manifest.targets[0].symbol;
-  $('#stamp').textContent =
-    `built ${manifest.generated_at.replace('T', ' ').replace('+00:00', 'Z')}`;
+  // Freshness is two facts: when this build ran, and how current the evidence
+  // behind it is. A build date on its own can look reassuring while resting on
+  // a months-old release.
+  const s = manifest.sources || {};
+  const day = (v) => (v ? new Date(v).toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'short', year: 'numeric' }) : null);
+  const parts = [`Data updated ${day(manifest.generated_at)}`];
+  if (s.clinvar_release) parts.push(`ClinVar ${day(s.clinvar_release)}`);
+  if (s.opentargets_release) parts.push(`Open Targets ${s.opentargets_release}`);
+  $('#stamp').textContent = parts.join(' · ');
+  $('#stamp').title = `Static snapshot — reloading this page does not fetch new `
+    + `data. Built ${manifest.generated_at}.`;
 
   $('#targets').innerHTML = manifest.targets.map((t) =>
     `<button data-target="${t.symbol}">${t.symbol}</button>`).join('');

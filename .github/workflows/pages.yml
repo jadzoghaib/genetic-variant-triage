@@ -1,22 +1,33 @@
-# Publish site/ to GitHub Pages.
+# Build the site from source and publish it to GitHub Pages.
 #
-# Pages can only serve a branch root or /docs when deploying from a branch, and
-# this site lives in site/. Uploading it as a Pages artifact avoids renaming a
-# directory that the README, SPEC.md and export_site.py all refer to as "site" —
-# the deployment adapts to the repository rather than the other way round.
+# The site is BUILT here, not committed. Pages deploys an uploaded artifact
+# rather than a branch, so the workflow can regenerate site/data on every run
+# and never store it in git. That matters for a weekly schedule: committing
+# ~7 MB of regenerated payloads every refresh would add well over 100 MB a year
+# to the repository, and the history would be data churn rather than code.
 #
-# There is no build step: export_site.py has already produced everything, and
-# site/data/ is committed precisely so this stays a copy, not a pipeline. That
-# also means the runner never needs the 104 MB store or any upstream API.
+# It also makes the deployed site strictly more trustworthy — it is always the
+# output of the pipeline the test suite covers, never a committed snapshot that
+# has quietly drifted from it.
+#
+# Nothing is cached deliberately. The connectors cache downloads by filename
+# without a version in the key, so a warm cache would keep serving an old
+# AlphaFold model release forever — exactly the staleness this schedule exists
+# to prevent. A cold fetch each run costs a few minutes and is always correct.
 
-name: Deploy site to Pages
+name: Build and deploy site
 
 on:
   push:
     branches: [master]
-    paths:
-      - 'site/**'
-      - '.github/workflows/pages.yml'
+    paths-ignore:
+      - 'README.md'
+      - 'SPEC.md'
+      - '.gitignore'
+  schedule:
+    # ClinVar publishes its weekly archive midweek (the release this was built
+    # against was dated a Wednesday), so run Thursday morning UTC to pick it up.
+    - cron: '0 6 * * 4'
   workflow_dispatch:
 
 permissions:
@@ -24,31 +35,52 @@ permissions:
   pages: write
   id-token: write
 
-# Never let two deploys race; queue instead of cancelling, so a run that is
-# already publishing is allowed to finish.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the payloads survived checkout
-        # site/data/** is marked -text in .gitattributes so PDB records are not
-        # rewritten. If that ever regresses, fail here rather than shipping
-        # structures with a stray CR in every atom record.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true          # python deps only, never the data cache
+
+      - name: Build the ontology from public sources
+        run: uv run python ingest.py
+
+      - name: Generate the site
+        run: uv run python export_site.py
+
+      - name: Verify the rules still hold
+        # A scheduled build runs unattended, so the gates matter more here than
+        # locally: upstream data can change in ways that break an invariant, and
+        # a failed run leaves the previous deployment live rather than shipping
+        # something wrong.
         run: |
-          if grep -qlU $'\r' site/data/*.pdb; then
-            echo "::error::CR bytes found in a .pdb payload — check .gitattributes"
-            exit 1
-          fi
-          echo "$(ls site/data | wc -l) payload files, line endings intact"
+          uv run --with pytest pytest -q
+          uv run python validate_phase1.py
+          uv run python validate_phase2.py
+          uv run python audit_site.py
+
+      - name: Report what this build is standing on
+        run: |
+          uv run python -c "
+          import json, pathlib
+          m = json.loads(pathlib.Path('site/data/manifest.json').read_text())
+          print('built      ', m['generated_at'])
+          for k, v in (m.get('sources') or {}).items():
+              print(f'{k:<20} {v}')
+          print('targets    ', ', '.join(t['symbol'] for t in m['targets']))
+          print('predictions', sum(t['kpi']['predictions'] for t in m['targets']))
+          " >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/configure-pages@v5
 

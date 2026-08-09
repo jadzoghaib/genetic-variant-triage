@@ -13,10 +13,15 @@ phase0_scratch.duckdb
 # deployed site is built from.
 /data/
 
-# site/data/ and site/vendor/ are deliberately NOT ignored. They are generated,
-# but GitHub Pages serves straight from the repository, so committing them is
-# what makes this deployable without a build step. They total ~3.8 MB.
-# See the licensing note in README.md before publishing site/data/ publicly.
+# Generated site payloads. NOT committed: the Pages workflow rebuilds them on
+# every deploy and on a weekly schedule, and uploads the result as an artifact
+# rather than pushing it. Committing them would add well over 100 MB a year to
+# the history for no benefit, and would let the deployed site drift from the
+# pipeline the tests cover.
+#
+# Build them locally with: uv run python ingest.py && uv run python export_site.py
+site/data/
+site/vendor/
 
 # Exported decision logs may contain analyst names and rationales.
 locus-decisions-*.json
