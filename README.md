@@ -6,7 +6,10 @@
 > The deployed site is a **snapshot, not a live feed**. It never calls an upstream
 > API at view time — that is why it cannot break when one goes down, and why it
 > does not update itself. The build date is printed in the console header.
-> [How to refresh it →](#refreshing-the-data)
+>
+> **Reloading the page does not fetch new data.** It re-downloads the same files
+> that were generated at build time. Refreshing means re-running the pipeline and
+> pushing — [see below](#refreshing-the-data).
 
 
 Two linked questions in early drug discovery and clinical genetics, over one
@@ -61,6 +64,14 @@ files, so **new ClinVar assertions or new structures will not appear until you
 rebuild and push.** That is a deliberate trade: the deployed console cannot be
 broken by an upstream outage, an API change, or a rate limit — but it is only
 ever as current as its last build.
+
+To be unambiguous, because this is easy to assume otherwise: **reloading the
+deployed page fetches nothing new.** The variant scores, structures and dossiers
+are baked into `site/data/` when `export_site.py` runs, and the browser only ever
+reads those files. `ingest.py` is the sole step that contacts an upstream
+source, and it runs on your machine, not in the visitor's browser. A hard reload
+is worth doing only when a rebuild has already been pushed and you suspect a
+cached copy.
 
 The console header prints the build timestamp, so you can always see how old
 what you are looking at is.
