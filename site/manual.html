@@ -1177,24 +1177,31 @@ uv run python audit_site.py                                      # every display
     from the database and fails if the site disagrees.
   </p>
 
-  <h3>The deployed site is a snapshot</h3>
+  <h3>The deployed site is a snapshot, rebuilt weekly</h3>
 
   <p>
-    Nothing here updates on its own. The published console never calls an
-    upstream API at view time, which is why it cannot be broken by an outage, a
-    rate limit or a schema change — and equally why new ClinVar assertions will
-    not appear until someone rebuilds and pushes. The build date is printed in
-    the console header so the age of what you are looking at is never a
-    mystery.
+    The published console never calls an upstream API at view time, which is why
+    it cannot be broken by an outage, a rate limit or a schema change — and
+    equally why <strong>reloading the page fetches nothing new</strong>. It
+    reads files that were generated at build time.
   </p>
 
   <p>
-    ClinVar is the source that actually moves: it publishes weekly, and
+    A scheduled workflow rebuilds the whole thing every Thursday: it re-fetches
+    every source, regenerates the site, and runs the full test suite, both phase
+    validators and the audit before deploying. A build that breaks an invariant
+    leaves the previous deployment live rather than shipping something wrong.
+    The header states both the build date and which ClinVar and Open Targets
+    releases it stands on, because a build date alone can look reassuring while
+    resting on a months-old release.
+  </p>
+
+  <p>
+    ClinVar is the source that actually moves — it publishes weekly, and
     reclassification is exactly the event this tool cares about. New RCSB
     depositions matter too, since a structure solved this week can promote a
     residue from <em>predicted</em> to <em>experimentally solved</em> and change
-    an evidence tier. Refreshing is the three commands above plus a push, which
-    redeploys automatically.
+    an evidence tier.
   </p>
 
   <p>

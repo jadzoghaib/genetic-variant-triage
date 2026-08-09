@@ -3,13 +3,13 @@
 **[Open the console →](https://jadzoghaib.github.io/genetic-variant-triage/)**
  · **[Read the manual →](https://jadzoghaib.github.io/genetic-variant-triage/manual.html)**
 
-> The deployed site is a **snapshot, not a live feed**. It never calls an upstream
-> API at view time — that is why it cannot break when one goes down, and why it
-> does not update itself. The build date is printed in the console header.
+> **Rebuilt from source every Thursday.** The console header shows when the data
+> was last refreshed and which ClinVar and Open Targets releases it stands on.
 >
-> **Reloading the page does not fetch new data.** It re-downloads the same files
-> that were generated at build time. Refreshing means re-running the pipeline and
-> pushing — [see below](#refreshing-the-data).
+> It is still a snapshot, not a live feed — it never calls an upstream API at
+> view time, which is why it cannot break when one goes down. **Reloading the
+> page does not fetch new data**; it re-downloads the same files the last build
+> produced. [How the refresh works →](#refreshing-the-data)
 
 
 Two linked questions in early drug discovery and clinical genetics, over one
@@ -59,19 +59,39 @@ uv run python audit_site.py                                      #  87  exported
 
 ## Refreshing the data
 
-Nothing here updates on its own. The site is generated once and served as plain
-files, so **new ClinVar assertions or new structures will not appear until you
-rebuild and push.** That is a deliberate trade: the deployed console cannot be
-broken by an upstream outage, an API change, or a rate limit — but it is only
-ever as current as its last build.
+`.github/workflows/pages.yml` rebuilds the whole thing **every Thursday at
+06:00 UTC**, and on every push that touches code. It runs `ingest.py` against
+the live sources, regenerates the site, runs the full test suite plus both phase
+validators and `audit_site.py`, and only then deploys. A build that breaks an
+invariant leaves the previous deployment live rather than shipping something
+wrong. The first end-to-end run took **64 seconds**.
 
-To be unambiguous, because this is easy to assume otherwise: **reloading the
-deployed page fetches nothing new.** The variant scores, structures and dossiers
-are baked into `site/data/` when `export_site.py` runs, and the browser only ever
-reads those files. `ingest.py` is the sole step that contacts an upstream
-source, and it runs on your machine, not in the visitor's browser. A hard reload
-is worth doing only when a rebuild has already been pushed and you suspect a
-cached copy.
+**The payloads are not committed.** Pages deploys an uploaded artifact rather
+than a branch, so the workflow generates `site/data/` on each run and throws it
+away. Committing ~7 MB of regenerated data weekly would add well over 100 MB a
+year and turn the history into data churn; this way the repository stays at
+about 0.6 MB and the deployed site is always the output of the pipeline the
+tests cover, never a snapshot that has quietly drifted from it.
+
+Nothing is cached on purpose. The connectors key their download cache on
+filename with no version in it, so a warm cache would happily serve a superseded
+AlphaFold model release forever — exactly the staleness the schedule exists to
+prevent.
+
+To refresh by hand, either trigger the workflow (`gh workflow run pages.yml`) or
+build locally:
+
+```bash
+uv run python ingest.py          # the only step that contacts an upstream source
+uv run python export_site.py     # regenerate site/data
+uv run python serve.py           # http://localhost:8080
+```
+
+One thing that stays true regardless: **reloading the deployed page fetches
+nothing new.** Scores, structures and dossiers are baked into `site/data/` at
+build time and the browser only ever reads those files. A hard reload helps in
+exactly one case — a rebuild has already been published and you suspect a cached
+copy.
 
 The console header prints the build timestamp, so you can always see how old
 what you are looking at is.
@@ -98,19 +118,11 @@ The push is the deploy: `.github/workflows/pages.yml` fires on any change under
 
 ### Decisions know when they are stale
 
-If you have recorded review decisions, refreshing does not silently invalidate
+If you have recorded review decisions, a refresh does not silently invalidate
 them. Every decision stores the data build it was made against, so after a
-rebuild any earlier judgement is flagged **stale build** in the audit log rather
+rebuild an earlier judgement is flagged **stale build** in the audit log rather
 than presented as current — the evidence behind it may have moved, and you are
-told so instead of having to remember.
-
-### Could this refresh itself?
-
-A scheduled workflow could run the rebuild on a cron. It would work, but weigh
-the cost first: each refresh commits several megabytes of regenerated payloads,
-so the repository grows with every run, and a silent automated rebuild removes
-the chance to look at what changed before it goes live. For a portfolio piece a
-manual refresh when you want one is the better trade.
+told rather than left to remember.
 
 ---
 
