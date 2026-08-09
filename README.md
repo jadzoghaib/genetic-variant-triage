@@ -219,9 +219,12 @@ All public, none requiring an API key.
 
 ### Licensing
 
-**This repository contains only original code.** The generated payloads are not
-committed — the Pages workflow builds them — so nothing in here is a derivative
-of a restricted dataset, and the pipeline itself carries no upstream
+**The code is MIT** ([LICENSE](LICENSE)) — use it, fork it, lift whatever is
+useful.
+
+That is clean because this repository contains only original code. The generated
+payloads are not committed (the Pages workflow builds them), so nothing here is
+a derivative of a restricted dataset and the pipeline carries no upstream
 restriction.
 
 The obligation attaches to the **output**, not the source. Anything
