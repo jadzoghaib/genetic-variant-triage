@@ -1,0 +1,60 @@
+# Publish site/ to GitHub Pages.
+#
+# Pages can only serve a branch root or /docs when deploying from a branch, and
+# this site lives in site/. Uploading it as a Pages artifact avoids renaming a
+# directory that the README, SPEC.md and export_site.py all refer to as "site" —
+# the deployment adapts to the repository rather than the other way round.
+#
+# There is no build step: export_site.py has already produced everything, and
+# site/data/ is committed precisely so this stays a copy, not a pipeline. That
+# also means the runner never needs the 104 MB store or any upstream API.
+
+name: Deploy site to Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue instead of cancelling, so a run that is
+# already publishing is allowed to finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the payloads survived checkout
+        # site/data/** is marked -text in .gitattributes so PDB records are not
+        # rewritten. If that ever regresses, fail here rather than shipping
+        # structures with a stray CR in every atom record.
+        run: |
+          if grep -qlU $'\r' site/data/*.pdb; then
+            echo "::error::CR bytes found in a .pdb payload — check .gitattributes"
+            exit 1
+          fi
+          echo "$(ls site/data | wc -l) payload files, line endings intact"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

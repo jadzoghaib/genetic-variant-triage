@@ -83,6 +83,12 @@
     font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;
   }
+  .topline { display: flex; align-items: baseline; justify-content: space-between;
+             gap: 1rem; flex-wrap: wrap; }
+  .topline .eyebrow { margin-bottom: 0; }
+  .backlink { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.04em;
+              text-decoration: none; white-space: nowrap; }
+  .backlink:hover { text-decoration: underline; }
   h1 {
     font-family: var(--serif); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem);
     line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 0.9rem;
@@ -219,7 +225,10 @@
 
 <header class="masthead">
   <div class="masthead-inner">
-    <div class="eyebrow">Manual · genetic-variant-triage</div>
+    <div class="topline">
+      <div class="eyebrow">Manual · genetic-variant-triage</div>
+      <a class="backlink" href="index.html">Open the console &rarr;</a>
+    </div>
     <h1>When a genetic test says “we don’t know”</h1>
     <p class="standfirst">
       Roughly half of the missense variants in ClinVar are filed as uncertain —
@@ -1151,6 +1160,10 @@ uv run python audit_site.py                                      # every display
       AlphaMissense data is CC BY-NC-SA 4.0 — non-commercial use only. This tool
       surfaces candidates for expert review; it does not assert clinical
       classifications.
+    </p>
+    <p>
+      <a href="index.html">Open the console</a> ·
+      <a href="https://github.com/jadzoghaib/genetic-variant-triage">Source on GitHub</a>
     </p>
   </div>
 </footer>
