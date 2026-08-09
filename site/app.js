@@ -257,7 +257,7 @@ function paint(viewer, buckets, focus) {
   viewer.render();
 }
 
-async function renderStructure(t, profile, focus) {
+async function renderStructure(t, profile, focus, seq) {
   $('#struct-h').textContent = `Structure · ${t.structure_id}`
     + (focus != null ? ` · focused on residue ${focus}` : '');
 
@@ -271,6 +271,9 @@ async function renderStructure(t, profile, focus) {
   }
   if (currentStructureId !== t.structure_id) {
     const pdb = await load(`${t.structure_id}.pdb`);
+    // A structure file is the largest fetch on the page, so this is the await
+    // most likely to be overtaken by a newer selection.
+    if (seq !== undefined && superseded(seq)) return;
     for (const v of [viewers.am, viewers.tier]) {
       v.clear();
       v.addModel(pdb, 'pdb');
@@ -478,7 +481,16 @@ function readHash() {
   if (find != null) { state.filters.search = find; $('#f-search').value = find; }
 }
 
+// render() is async and can be in flight more than once — clicking a target and
+// then a view fires two. Without a guard the slower-resolving earlier call
+// finishes last and paints ITS target over the newer one, so a fast click can
+// show one gene's dossier under another gene's heading. Every render takes a
+// ticket and abandons itself at the next await if a newer one has started.
+let renderSeq = 0;
+const superseded = (seq) => seq !== renderSeq;
+
 async function render() {
+  const seq = ++renderSeq;
   const t = manifest.targets.find((x) => x.symbol === state.target);
 
   document.querySelectorAll('#targets button').forEach((b) =>
@@ -496,6 +508,7 @@ async function render() {
   if (state.view === 'audit') { renderAudit(); return; }
   if (state.view === 'dossier') {
     const dossier = await load(`dossier_${t.symbol}.json`);
+    if (superseded(seq)) return;
     renderDossier(t, dossier);
     renderTargetActions(t, dossier);
     return;
@@ -511,6 +524,7 @@ async function render() {
   ].map(([v, kk]) => `<div><div class="v">${v}</div><div class="k">${kk}</div></div>`).join('');
 
   const payload = await load(`variants_${t.symbol}.json`);
+  if (superseded(seq)) return;
   worklistAll = VM.rows(payload);
   worklistView = VM.sortWorklist(VM.applyFilters(worklistAll, state.filters));
 
@@ -529,9 +543,10 @@ async function render() {
   renderDetail(state.selected != null ? worklistAll[state.selected] : null);
 
   const profile = await load(`profile_${t.symbol}.json`);
+  if (superseded(seq)) return;
   $('#profile').innerHTML = profileSVG(profile);
   await renderStructure(t, profile,
-    state.selected != null ? worklistAll[state.selected].pos : null);
+    state.selected != null ? worklistAll[state.selected].pos : null, seq);
 }
 
 /* ── wiring ────────────────────────────────────────────────────────── */
