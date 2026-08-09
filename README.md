@@ -217,23 +217,25 @@ All public, none requiring an API key.
 | [Ensembl VEP](https://rest.ensembl.org) | Transcript consequences (diagnostics only) | Apache 2.0 |
 | [3Dmol.js](https://3dmol.csb.pitt.edu) | Structure viewer (vendored) | BSD-3-Clause |
 
-### Licensing note before publishing
+### Licensing
 
-The code here is yours to license as you like. **`site/data/` is not** — it
-contains values derived from AlphaMissense, which is **CC BY-NC-SA 4.0**. That
-carries three obligations that follow the data wherever it goes:
+**This repository contains only original code.** The generated payloads are not
+committed — the Pages workflow builds them — so nothing in here is a derivative
+of a restricted dataset, and the pipeline itself carries no upstream
+restriction.
 
-- **Attribution** — satisfied by the footer and the table above.
+The obligation attaches to the **output**, not the source. Anything
+`export_site.py` produces contains values derived from AlphaMissense, which is
+**CC BY-NC-SA 4.0**:
+
+- **Attribution** — satisfied by the console footer and the source table above.
 - **NonCommercial** — a portfolio or research deployment is fine; a commercial
   product is not.
-- **ShareAlike** — a derivative of NC-SA data must be offered under the same
-  terms. That applies to the exported payloads, not to the pipeline code.
+- **ShareAlike** — a derivative of the *data* must be offered under the same
+  terms. This does not reach the code that generated it.
 
-So a public repository and a GitHub Pages deployment are both fine, provided the
-non-commercial framing stays visible. If you ever want this under a permissive
-licence with no strings, drop `site/data/` from the repository and have viewers
-build it themselves with `ingest.py` + `export_site.py` — the pipeline carries
-no such restriction.
+So the deployed site is fine as published, and anyone who clones this and runs
+the pipeline inherits the same terms on what they build.
 
 Cite the underlying work if you build on this:
 Cheng *et al.*, *Science* (2023) for AlphaMissense; Jumper *et al.*, *Nature*
