@@ -3,6 +3,11 @@
 **[Open the console →](https://jadzoghaib.github.io/genetic-variant-triage/)**
  · **[Read the manual →](https://jadzoghaib.github.io/genetic-variant-triage/manual.html)**
 
+> The deployed site is a **snapshot, not a live feed**. It never calls an upstream
+> API at view time — that is why it cannot break when one goes down, and why it
+> does not update itself. The build date is printed in the console header.
+> [How to refresh it →](#refreshing-the-data)
+
 
 Two linked questions in early drug discovery and clinical genetics, over one
 ontology:
@@ -46,6 +51,55 @@ node --test tests/decisions.test.mjs tests/view-model.test.mjs   #  30  governan
 uv run python validate_phase1.py && uv run python validate_phase2.py
 uv run python audit_site.py                                      #  87  exported site vs the store
 ```
+
+---
+
+## Refreshing the data
+
+Nothing here updates on its own. The site is generated once and served as plain
+files, so **new ClinVar assertions or new structures will not appear until you
+rebuild and push.** That is a deliberate trade: the deployed console cannot be
+broken by an upstream outage, an API change, or a rate limit — but it is only
+ever as current as its last build.
+
+The console header prints the build timestamp, so you can always see how old
+what you are looking at is.
+
+```bash
+uv run python ingest.py          # re-fetch every source          (~6 min for 8 genes)
+uv run python export_site.py     # regenerate site/data
+uv run python audit_site.py      # confirm the site matches the store
+git add -A && git commit -m "Refresh data" && git push
+```
+
+The push is the deploy: `.github/workflows/pages.yml` fires on any change under
+`site/`, and the new build is live in about twenty seconds.
+
+### What actually changes upstream, and how fast
+
+| Source | Cadence | Worth knowing |
+|---|---|---|
+| **ClinVar** | weekly | The only source that moves meaningfully week to week — assertions get added, and variants get reclassified out of "uncertain". This is the reason to refresh. |
+| **RCSB PDB** | weekly | New depositions can turn a *predicted* residue into a *solved* one, which changes an evidence tier. |
+| **Open Targets** | periodic releases | Currently `26.06`. Association scores and drug lists shift between releases. |
+| **AlphaFold DB** | infrequent, versioned | Model versions do change — this project lived through `v4` → `v6`. File URLs are always read from the API, never constructed, precisely so that a bump does not 404. |
+| **AlphaMissense** | effectively static | A published dataset rather than a moving service. |
+
+### Decisions know when they are stale
+
+If you have recorded review decisions, refreshing does not silently invalidate
+them. Every decision stores the data build it was made against, so after a
+rebuild any earlier judgement is flagged **stale build** in the audit log rather
+than presented as current — the evidence behind it may have moved, and you are
+told so instead of having to remember.
+
+### Could this refresh itself?
+
+A scheduled workflow could run the rebuild on a cron. It would work, but weigh
+the cost first: each refresh commits several megabytes of regenerated payloads,
+so the repository grows with every run, and a silent automated rebuild removes
+the chance to look at what changed before it goes live. For a portfolio piece a
+manual refresh when you want one is the better trade.
 
 ---
 

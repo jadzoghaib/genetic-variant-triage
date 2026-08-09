@@ -1176,6 +1176,32 @@ uv run python audit_site.py                                      # every display
     and a second copy can drift. It recomputes every headline figure straight
     from the database and fails if the site disagrees.
   </p>
+
+  <h3>The deployed site is a snapshot</h3>
+
+  <p>
+    Nothing here updates on its own. The published console never calls an
+    upstream API at view time, which is why it cannot be broken by an outage, a
+    rate limit or a schema change — and equally why new ClinVar assertions will
+    not appear until someone rebuilds and pushes. The build date is printed in
+    the console header so the age of what you are looking at is never a
+    mystery.
+  </p>
+
+  <p>
+    ClinVar is the source that actually moves: it publishes weekly, and
+    reclassification is exactly the event this tool cares about. New RCSB
+    depositions matter too, since a structure solved this week can promote a
+    residue from <em>predicted</em> to <em>experimentally solved</em> and change
+    an evidence tier. Refreshing is the three commands above plus a push, which
+    redeploys automatically.
+  </p>
+
+  <p>
+    Recorded decisions survive that honestly. Each one stores the data build it
+    was made against, so after a rebuild an earlier judgement is flagged as
+    stale rather than quietly presented as current.
+  </p>
 </section>
 
 </main>
