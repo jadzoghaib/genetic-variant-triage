@@ -1,5 +1,9 @@
 # Locus — target &amp; variant intelligence console
 
+**[Open the console →](https://jadzoghaib.github.io/genetic-variant-triage/)**
+ · **[Read the manual →](https://jadzoghaib.github.io/genetic-variant-triage/manual.html)**
+
+
 Two linked questions in early drug discovery and clinical genetics, over one
 ontology:
 
@@ -89,7 +93,7 @@ touching a single rule.
 parallel connections only reach ~177 KB/s — an 18–32 minute wait. The VCF is
 bgzip-compressed with a tabix index and NCBI honours byte ranges, so
 `clinvar_regions.py` reads the index and fetches only the bytes covering each
-gene: **~1.5 MB and ~30 seconds for four genes.** ClinVar is an on-demand
+gene: **~1.5 MB and seconds per gene.** ClinVar is an on-demand
 per-target fetch, exactly like AlphaFold.
 
 **Three tiers of structural evidence, not two.** *experimentally solved >

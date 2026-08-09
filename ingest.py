@@ -19,15 +19,28 @@ from connectors import rcsb
 
 # symbol -> (uniprot accession, ensembl gene id)
 #
-# Three tumour suppressors plus one classically druggable kinase. EGFR is not
-# decoration: BRCA1 and PTEN return zero drugs and zero pockets from Open
-# Targets, so without a druggable target the dossier half would have nothing to
-# show. The contrast is the point.
+# The set is chosen to span the axes the tool has to handle, not to be a list of
+# famous genes. Every archetype the dossier can emit appears at least once, and
+# the structural range runs from a protein that is mostly disordered to one that
+# is almost entirely solved.
+#
+# Adding a gene is this one edit plus a re-export — but anything over ~2,700
+# residues will trip the variant_effect -> residue foreign key, because
+# AlphaFold DB splits those into F1/F2 fragments and this schema assumes one.
+# That constraint was written to fail loudly rather than drop rows quietly.
 GENES = {
-    "BRCA1": ("P38398", "ENSG00000012048"),   # pLDDT 41.6, largely disordered
-    "TP53":  ("P04637", "ENSG00000141510"),   # pLDDT 75.1, mixed
-    "PTEN":  ("P60484", "ENSG00000171862"),   # pLDDT 83.0, well folded
+    "BRCA1": ("P38398", "ENSG00000012048"),   # pLDDT 41.6 — largely disordered
+    "TP53":  ("P04637", "ENSG00000141510"),   # pLDDT 75.1 — mixed
+    "PTEN":  ("P60484", "ENSG00000171862"),   # pLDDT 83.0 — well folded
     "EGFR":  ("P00533", "ENSG00000146648"),   # druggable kinase, 392 PDB entities
+    "CFTR":  ("P13569", "ENSG00000001626"),   # recessive; a transporter with
+                                              # approved modulator drugs
+    "KRAS":  ("P01116", "ENSG00000133703"),   # 189 aa, pLDDT 91.5 — the classic
+                                              # "undruggable" oncogene that only
+                                              # recently acquired inhibitors
+    "MLH1":  ("P40692", "ENSG00000076242"),   # mismatch repair, Lynch syndrome
+    "SCN1A": ("P35498", "ENSG00000144285"),   # 2,009 aa ion channel, and the one
+                                              # non-cancer gene in the set
 }
 
 ASSEMBLY = "GRCh38"

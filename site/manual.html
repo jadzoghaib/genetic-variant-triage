@@ -291,8 +291,8 @@
   </p>
 
   <p>
-    Across the four genes this tool loads, ClinVar records
-    <strong>6,488 missense variants as uncertain or conflicting</strong>. Each
+    Across the eight genes this tool loads, ClinVar records
+    <strong>14,359 missense variants as uncertain or conflicting</strong>. Each
     one is somebody’s inconclusive test result.
   </p>
 </section>
@@ -883,7 +883,7 @@
   <h2>Building a worklist</h2>
 
   <p>
-    Around 30% of predictions land in an actionable class — far too many to
+    About a quarter of predictions land in an actionable class — far too many to
     review. Priority narrows that to a queue a curator could actually work
     through, using rules rather than a score.
   </p>
@@ -906,8 +906,8 @@
   </p>
 
   <p>
-    Applied to four genes, that takes 7,834 actionable variants down to
-    <strong>462 at high priority</strong>.
+    Applied to eight genes, that takes 13,247 actionable variants down to
+    <strong>1,023 at high priority</strong> — out of 55,177 predictions.
   </p>
 </section>
 
@@ -926,28 +926,63 @@
   <div class="wide">
     <table>
       <thead>
-        <tr><th>Gene</th><th>Genetic</th><th>Pocket</th><th class="num">Drugs</th><th>Archetype</th></tr>
+        <tr><th>Gene</th><th>Genetic</th><th>Pocket</th><th class="num">Drugs</th>
+          <th class="num">Solved</th><th>Archetype</th></tr>
       </thead>
       <tbody>
         <tr>
           <td><span class="id">EGFR</span></td><td>strong</td><td>yes</td>
-          <td class="num">82</td><td>validated druggable target</td>
+          <td class="num">82</td><td class="num">87.4%</td>
+          <td>validated druggable target</td>
+        </tr>
+        <tr>
+          <td><span class="id">SCN1A</span></td><td>strong</td><td>no</td>
+          <td class="num">72</td><td class="num">100%</td>
+          <td>validated druggable target</td>
+        </tr>
+        <tr>
+          <td><span class="id">CFTR</span></td><td>strong</td><td>yes</td>
+          <td class="num">13</td><td class="num">100%</td>
+          <td>validated druggable target</td>
         </tr>
         <tr>
           <td><span class="id">TP53</span></td><td>strong</td><td>no</td>
-          <td class="num">9</td><td>genetically validated, clinically emerging</td>
+          <td class="num">9</td><td class="num">100%</td>
+          <td>genetically validated, clinically emerging</td>
         </tr>
         <tr>
-          <td><span class="id">BRCA1</span></td><td>strong</td><td>no</td>
-          <td class="num">0</td><td>genetically validated, chemically unexplored</td>
+          <td><span class="id">KRAS</span></td><td>strong</td><td>no</td>
+          <td class="num">3</td><td class="num">100%</td>
+          <td>validated druggable target</td>
+        </tr>
+        <tr>
+          <td><span class="id">MLH1</span></td><td>strong</td><td>no</td>
+          <td class="num">0</td><td class="num">82.5%</td>
+          <td>genetically validated, chemically unexplored</td>
         </tr>
         <tr>
           <td><span class="id">PTEN</span></td><td>strong</td><td>no</td>
-          <td class="num">0</td><td>genetically validated, chemically unexplored</td>
+          <td class="num">0</td><td class="num">100%</td>
+          <td>genetically validated, chemically unexplored</td>
+        </tr>
+        <tr>
+          <td><span class="id">BRCA1</span></td><td>strong</td><td>no</td>
+          <td class="num">0</td><td class="num">17.6%</td>
+          <td>genetically validated, chemically unexplored</td>
         </tr>
       </tbody>
     </table>
   </div>
+
+  <p>
+    <span class="id">KRAS</span> is the row that rewards a second look. Open
+    Targets reports <strong>no pocket</strong> — and it has three approved
+    drugs. Both are true: KRAS was called undruggable for forty years because
+    its surface is smooth, and the inhibitors that finally worked bind a
+    <em>cryptic</em> pocket that only opens in one conformation of one mutant.
+    A tool that resolved the contradiction by picking a side would have
+    destroyed the most interesting thing on the row.
+  </p>
 
   <p>
     BRCA1 is the instructive row. The genetic evidence tying it to breast cancer
@@ -1104,8 +1139,8 @@
     <li>The canonical transcript only, because that is all AlphaMissense
       publishes. Variants that are missense on some other transcript appear as
       having no prediction, which is honest rather than silent.</li>
-    <li>Four genes are loaded, of eight planned.</li>
-    <li>Proteins longer than about 2,700 residues will fail loudly on import —
+    <li>Eight genes are loaded. Adding one is a single edit and a re-export,
+      but proteins longer than about 2,700 residues will fail loudly on import —
       AlphaFold splits those into fragments and the schema assumes one. The
       constraint was written to break rather than silently drop rows.</li>
   </ul>

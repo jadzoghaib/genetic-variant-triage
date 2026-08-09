@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-08-08T20:20:09+00:00",
+ "generated_at": "2026-08-09T12:38:37+00:00",
  "targets": [
   {
    "symbol": "BRCA1",
@@ -13,6 +13,20 @@
     "upgrades": 352,
     "pct_solved": 17.6,
     "global_plddt": 41.6
+   }
+  },
+  {
+   "symbol": "CFTR",
+   "acc": "P13569",
+   "name": "CF transmembrane conductance regulator",
+   "structure_id": "AF-P13569-F1",
+   "kpi": {
+    "predictions": 9721,
+    "actionable": 1988,
+    "high": 182,
+    "upgrades": 684,
+    "pct_solved": 100.0,
+    "global_plddt": 75.6
    }
   },
   {
@@ -30,6 +44,34 @@
    }
   },
   {
+   "symbol": "KRAS",
+   "acc": "P01116",
+   "name": "KRas proto-oncogene, GTPase",
+   "structure_id": "AF-P01116-F1",
+   "kpi": {
+    "predictions": 1253,
+    "actionable": 98,
+    "high": 3,
+    "upgrades": 68,
+    "pct_solved": 100.0,
+    "global_plddt": 91.5
+   }
+  },
+  {
+   "symbol": "MLH1",
+   "acc": "P40692",
+   "name": "mutL homolog 1",
+   "structure_id": "AF-P40692-F1",
+   "kpi": {
+    "predictions": 4981,
+    "actionable": 1894,
+    "high": 277,
+    "upgrades": 734,
+    "pct_solved": 82.5,
+    "global_plddt": 77.3
+   }
+  },
+  {
    "symbol": "PTEN",
    "acc": "P60484",
    "name": "phosphatase and tensin homolog",
@@ -41,6 +83,20 @@
     "upgrades": 529,
     "pct_solved": 100.0,
     "global_plddt": 83.0
+   }
+  },
+  {
+   "symbol": "SCN1A",
+   "acc": "P35498",
+   "name": "sodium voltage-gated channel alpha subunit 1",
+   "structure_id": "AF-P35498-F1",
+   "kpi": {
+    "predictions": 13435,
+    "actionable": 1433,
+    "high": 99,
+    "upgrades": 796,
+    "pct_solved": 100.0,
+    "global_plddt": 68.5
    }
   },
   {

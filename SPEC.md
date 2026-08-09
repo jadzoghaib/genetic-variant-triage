@@ -484,7 +484,21 @@ node --test tests/decisions.test.mjs    #  13 — governance rules
 
 **Phase 7 — React cockpit. ⛔ SUPERSEDED.** The frontend was already replaced in Phase 5, and the replacement is a static site with no framework, no bundler and no dependencies. React would add a build step and a toolchain to a surface that does not need either. All seven phases are closed.
 
-Remaining work is not a phase but a choice: **more targets.** The gene set was eight in the original plan and stands at four. Adding CFTR, KRAS, MLH1 and SCN1A is one edit to `GENES` in `ingest.py` plus a re-export — with the caveat that any protein over ~2,700 residues will trip the deliberate `variant_effect → residue` foreign key, because AlphaFold DB splits those into F1/F2 fragments and this schema assumes one.
+### Gene set completed and deployed (2026-08-09)
+
+**All eight planned genes are loaded.** CFTR, KRAS, MLH1 and SCN1A were added in a single edit to `GENES` plus a re-export; all four accessions were pre-verified against Open Targets and checked against the ~2,700-residue fragment ceiling before the ingest ran, SCN1A being the largest at 2,009.
+
+The store grew to **55,177 predictions**, 14,359 of them uncertain. **13,247 are actionable (24.0%), narrowing to 1,023 at high priority.** `audit_site.py` scales with the target count and now runs **159 checks**, all passing; the Phase 0 baseline still reproduces exactly against its original three genes.
+
+The larger set exercises archetypes the four-gene set could not reach:
+
+- **KRAS** — Open Targets reports **no pocket**, yet it carries three approved drugs. Both are true: its surface is famously smooth, and the inhibitors that finally worked bind a *cryptic* pocket that opens only in one conformation of one mutant. The dossier shows the contradiction rather than resolving it.
+- **SCN1A** — 2,009 residues, 13,435 predictions, 72 drugs, and exactly **one** experimental structure. Ion channels resist crystallisation; that single cryo-EM entry covers the whole protein, which is why it still reads 100% solved.
+- **MLH1** — 82.5% solved and zero drugs, sitting between BRCA1's 17.6% and the fully-solved targets.
+
+**Live at https://jadzoghaib.github.io/genetic-variant-triage/** via `.github/workflows/pages.yml`, which uploads `site/` as a Pages artifact rather than renaming the directory. The repository homepage field and topics point at the same URL.
+
+Note that the per-phase figures recorded above were measured when the set was three or four genes, and are left as the historical record of those phases rather than restated.
 
 Curated demo gene set (mix of well-folded and disordered, well-annotated and sparse): `BRCA1`, `TP53`, `CFTR`, `PTEN`, `KRAS`, `EGFR`, `MLH1`, `SCN1A`.
 

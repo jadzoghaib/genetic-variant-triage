@@ -133,7 +133,11 @@ def cards(con):
     return out
 
 
-def test_all_four_targets_have_strong_genetic_evidence(cards):
+def test_every_loaded_target_has_strong_genetic_evidence(cards):
+    """The gene set is chosen from established disease genes, so a weak band
+    here means the Open Targets join went wrong, not that the biology is
+    marginal."""
+    assert len(cards) >= 4
     for symbol, card in cards.items():
         assert card["dimensions"]["genetic_evidence"]["band"] == D.STRONG, symbol
 
