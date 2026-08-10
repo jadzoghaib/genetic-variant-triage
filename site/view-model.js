@@ -134,6 +134,58 @@ export function ticks(n, pad, plot, target = 10) {
   return out;
 }
 
+/* ── spatial neighbourhood ─────────────────────────────────────────── */
+
+/**
+ * Residues whose alpha carbons lie within `cutoff` ångström of `resi`.
+ *
+ * This is the one question a sequence profile cannot answer. Positions far
+ * apart along the chain can be touching in the folded protein, so a set of
+ * damaging variants that looks scattered in sequence can be a single cluster
+ * around a binding site — which is what makes it a mechanism rather than a
+ * coincidence.
+ *
+ * CA-to-CA distance is a coarse proxy for contact: real side chains reach
+ * further than their backbone. 8 Å is the conventional cutoff for "in contact"
+ * on that measure, and it is deliberately not tuned per protein.
+ */
+export function spatialNeighbours(atoms, resi, cutoff = 8) {
+  const self = atoms.find((a) => a.resi === resi);
+  if (!self) return null;
+  const c2 = cutoff * cutoff;
+  return atoms
+    .filter((a) => {
+      if (a.resi === resi) return false;
+      const dx = a.x - self.x, dy = a.y - self.y, dz = a.z - self.z;
+      return dx * dx + dy * dy + dz * dz <= c2;
+    })
+    .map((a) => a.resi)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Summarise what sits around a residue in space, and how much of that the
+ * sequence hides.
+ *
+ * `distant` is the number that matters: neighbours more than `seqGap` positions
+ * away along the chain. A cluster of adjacent residues is visible in any
+ * profile; one drawn from opposite ends of the sequence is visible only in 3D.
+ */
+export function neighbourhood(atoms, resi, classOf, { cutoff = 8, seqGap = 10 } = {}) {
+  const near = spatialNeighbours(atoms, resi, cutoff);
+  if (near === null) return null;
+  const damaging = near.filter((r) => classOf(r) === 'LPath');
+  const distant = damaging.filter((r) => Math.abs(r - resi) > seqGap);
+  const positions = [resi, ...near];
+  return {
+    near,
+    damaging,
+    distant,
+    span: Math.max(...positions) - Math.min(...positions) + 1,
+    cutoff,
+  };
+}
+
 /* ── virtualisation ────────────────────────────────────────────────── */
 
 /**

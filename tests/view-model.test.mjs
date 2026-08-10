@@ -151,6 +151,62 @@ test('ticks are round numbers inside the sequence', () => {
   assert.ok(t.every((x) => x.value < 1863 && x.x > 38));
 });
 
+/* ── spatial neighbourhood ─────────────────────────────────────────── */
+
+// A deliberately contrived fold: residues 1-3 sit together, and residue 200 is
+// folded back against them despite being 197 positions away in sequence.
+// Residue 500 is off on its own.
+const atoms = [
+  { resi: 1, x: 0, y: 0, z: 0 },
+  { resi: 2, x: 3, y: 0, z: 0 },
+  { resi: 3, x: 0, y: 3, z: 0 },
+  { resi: 200, x: 0, y: 0, z: 5 },
+  { resi: 500, x: 50, y: 50, z: 50 },
+];
+
+test('neighbours are found by distance, not by sequence position', () => {
+  assert.deepEqual(VM.spatialNeighbours(atoms, 1, 8), [2, 3, 200]);
+  assert.deepEqual(VM.spatialNeighbours(atoms, 500, 8), [],
+    'an isolated residue has no contacts');
+});
+
+test('the cutoff is respected exactly at the boundary', () => {
+  assert.deepEqual(VM.spatialNeighbours(atoms, 1, 3), [2, 3],
+    'a residue exactly at the cutoff counts');
+  assert.deepEqual(VM.spatialNeighbours(atoms, 1, 2.9), []);
+});
+
+test('a residue with no coordinates returns null, not an empty answer', () => {
+  // Missing is not the same as isolated, and the caller must be able to tell.
+  assert.equal(VM.spatialNeighbours(atoms, 999, 8), null);
+  assert.equal(VM.neighbourhood(atoms, 999, () => 'LPath'), null);
+});
+
+test('the neighbourhood separates damaging contacts the sequence hides', () => {
+  // Everything nearby is damaging; only residue 200 is far away in sequence.
+  const n = VM.neighbourhood(atoms, 1, () => 'LPath');
+  assert.deepEqual(n.near, [2, 3, 200]);
+  assert.deepEqual(n.damaging, [2, 3, 200]);
+  assert.deepEqual(n.distant, [200],
+    'the whole point: a contact 199 positions away is invisible in a profile');
+  assert.equal(n.span, 200);
+});
+
+test('benign neighbours are not counted as damaging', () => {
+  const classOf = (r) => (r === 200 ? 'LPath' : 'LBen');
+  const n = VM.neighbourhood(atoms, 1, classOf);
+  assert.deepEqual(n.damaging, [200]);
+  assert.deepEqual(n.distant, [200]);
+});
+
+test('an adjacent-only cluster reports nothing distant', () => {
+  // Residues 1-3 touching each other is what any profile already shows, so it
+  // must not be presented as a 3D discovery.
+  const local = atoms.filter((a) => a.resi < 10);
+  const n = VM.neighbourhood(local, 1, () => 'LPath');
+  assert.deepEqual(n.distant, []);
+});
+
 /* ── virtualisation ────────────────────────────────────────────────── */
 
 test('the window draws a screenful and pads the rest', () => {

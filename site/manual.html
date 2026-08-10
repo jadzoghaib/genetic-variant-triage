@@ -859,6 +859,43 @@
     prediction thought.
   </p>
 
+  <h3>What the structure shows that the sequence cannot</h3>
+
+  <p>
+    A fair challenge to any 3D view in a tool like this is that it is
+    decoration. Mostly it would be: the triage decision is driven by the ClinVar
+    class, the model score, the star rating and the evidence tier, every one of
+    which is in the table. The sequence profile already shows variant burden and
+    structural confidence in a form you can read positions off. A rotating
+    ribbon adds nothing to that.
+  </p>
+
+  <p>
+    There is exactly one thing it can do that a one-dimensional view
+    structurally cannot: <strong>show which residues are close together in
+    space.</strong> Positions far apart along the chain can be touching in the
+    folded protein, so a set of damaging variants that looks scattered in
+    sequence can be a single cluster around a functional site — which is the
+    difference between a coincidence and a mechanism.
+  </p>
+
+  <p>
+    So the console states that as a finding rather than leaving it to be
+    admired. Selecting <span class="id">PTEN R130G</span> reports
+    <strong>17 likely-pathogenic residues within 8 Å, nine of them more than ten
+    positions away in the sequence</strong>, and lights those contacts up in the
+    structure. R130 is the catalytic arginine of the phosphatase motif; the
+    cluster around it is the active site. No profile could have told you that.
+  </p>
+
+  <p>
+    The distances are computed from the coordinates the viewer has already
+    loaded, so the finding costs no extra data. Alpha-carbon separation is a
+    coarse proxy for contact — real side chains reach further than their
+    backbone — and 8 Å is the conventional cutoff on that measure, applied
+    uniformly rather than tuned per protein.
+  </p>
+
   <h3>A second thing this corrected</h3>
 
   <p>

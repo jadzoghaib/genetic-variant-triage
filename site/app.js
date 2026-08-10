@@ -241,12 +241,19 @@ function requireAnalyst() {
 
 /* ── 3D ────────────────────────────────────────────────────────────── */
 
-function paint(viewer, buckets, focus) {
+function paint(viewer, buckets, focus, contacts = []) {
   viewer.setStyle({}, { cartoon: { color: PALETTE.am._none } });
   for (const [color, resi] of Object.entries(buckets)) {
     viewer.setStyle({ resi }, { cartoon: { color } });
   }
   if (focus != null) {
+    // Damaging residues in contact with the selection, drawn so the cluster is
+    // visible as a cluster. This is the only thing the 3D shows that the
+    // sequence profile cannot.
+    if (contacts.length) {
+      viewer.addStyle({ resi: contacts },
+        { sphere: { radius: 0.7, color: PALETTE.am.LPath, opacity: 0.85 } });
+    }
     viewer.addStyle({ resi: [focus] }, { stick: { radius: 0.32, color: '#ffffff' } });
     viewer.addStyle({ resi: [focus] },
       { sphere: { radius: 1.0, color: '#ffffff', opacity: 0.55 } });
@@ -255,6 +262,19 @@ function paint(viewer, buckets, focus) {
     viewer.zoomTo();
   }
   viewer.render();
+}
+
+/** Damaging residues touching the selection, computed from the coordinates
+ *  3Dmol already holds — no extra payload, and nothing to keep in sync. */
+function contactFinding(profile, focus) {
+  if (focus == null || !viewers.am) return null;
+  const atoms = viewers.am.selectedAtoms({ atom: 'CA' });
+  if (!atoms.length) return null;
+  const classOf = (r) => {
+    const code = profile.amc[r - 1];
+    return code < 0 ? null : profile.levels.amc[code];
+  };
+  return VM.neighbourhood(atoms, focus, classOf);
 }
 
 async function renderStructure(t, profile, focus, seq) {
@@ -286,8 +306,31 @@ async function renderStructure(t, profile, focus, seq) {
   }
   viewers.am.resize();
   viewers.tier.resize();
-  paint(viewers.am, VM.colorBuckets(profile, 'am', PALETTE.am), focus);
+  const hood = contactFinding(profile, focus);
+  paint(viewers.am, VM.colorBuckets(profile, 'am', PALETTE.am), focus,
+        hood ? hood.damaging : []);
   paint(viewers.tier, VM.colorBuckets(profile, 'tier', PALETTE.tier), focus);
+  renderContactFinding(hood, focus);
+}
+
+/** State the finding in words. A picture of a cluster is suggestive; the count
+ *  of contacts the sequence hides is the actual claim. */
+function renderContactFinding(hood, focus) {
+  const el = $('#contact-finding');
+  if (!el) return;
+  if (!hood || focus == null) { el.innerHTML = ''; return; }
+  if (!hood.damaging.length) {
+    el.innerHTML = `<span class="dim">No likely-pathogenic residues within
+      ${hood.cutoff} Å of residue ${focus}.</span>`;
+    return;
+  }
+  const d = hood.distant.length;
+  el.innerHTML = `<b>${hood.damaging.length}</b> likely-pathogenic residue`
+    + `${hood.damaging.length === 1 ? '' : 's'} within ${hood.cutoff} Å of `
+    + `residue ${focus}`
+    + (d ? `, <b>${d}</b> of them more than 10 positions away in the sequence — `
+         + `a cluster the sequence profile cannot show.`
+         : `, all of them sequence neighbours.`);
 }
 
 /** Structure → variant traversal: clicking a residue selects its most damaging

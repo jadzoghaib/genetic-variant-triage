@@ -213,6 +213,11 @@ tbody td.empty { white-space: normal; line-height: 1.55; max-width: 0; }
 
 /* ── structure ──────────────────────────────────────────────────────── */
 
+/* The claim the 3D exists to make, stated in words above the picture. */
+.finding { margin: 0.35rem 0 0; font-size: 0.83rem; color: var(--ink-2);
+           line-height: 1.55; max-width: 62rem; }
+.finding b { color: var(--ink); }
+
 .mols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem;
         margin-top: 0.75rem; }
 @media (max-width: 1100px) { .mols { grid-template-columns: 1fr; } }
