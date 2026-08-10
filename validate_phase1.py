@@ -90,8 +90,14 @@ repro = con.execute(f"""
 for k, expected in PHASE0.items():
     got = int(repro[k])
     delta = got - expected
-    flag = "exact" if delta == 0 else f"+{delta}" if delta > 0 else str(delta)
-    print(f"  {k:12s} phase0={expected:>6,}  schema={got:>6,}  ({flag})")
+    pct = abs(delta) / expected
+    # Drift is expected, not a fault: the baseline is a fixed 2026-08-07
+    # snapshot and ClinVar reclassifies continuously. Only a large swing means
+    # the pipeline has broken.
+    flag = ("exact" if delta == 0
+            else f"{delta:+d}, {pct:.2%} — reclassification" if pct < 0.10
+            else f"{delta:+d}, {pct:.1%} — TOO LARGE, check the pipeline")
+    print(f"  {k:12s} 2026-08-07={expected:>6,}  now={got:>6,}  ({flag})")
 
 # A delta is expected and benign: Phase 0 filtered on ClinVar's MC field, which
 # under-counts here because some variants carry an AlphaMissense prediction

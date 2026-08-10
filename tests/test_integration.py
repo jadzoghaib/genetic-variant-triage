@@ -12,8 +12,11 @@ from core import confidence as C
 from core import dossier as D
 from core import triage as T
 
-# Phase 0 spike baseline, computed before the schema existed. Scoped to the
-# three genes it was measured on, so adding targets cannot silently move it.
+# Phase 0 spike baseline, measured 2026-08-07 before the schema existed, scoped
+# to the three genes it ran on. Treated as a reference point rather than a
+# fixture: the pipeline now rebuilds weekly against live ClinVar, so these
+# numbers drift as variants are reclassified. See
+# test_phase0_baseline_has_not_drifted_implausibly.
 PHASE0_GENES = ("BRCA1", "TP53", "PTEN")
 PHASE0 = {"uncertain": 6488, "upgrades": 1308, "downgrades": 4807}
 
@@ -101,15 +104,54 @@ def test_l858r_is_rescued_by_experimental_coverage(triaged):
 
 # ── regression against the Phase 0 spike ──────────────────────────────────
 
-def test_phase0_numbers_still_reproduce(triaged):
-    df = triaged[triaged.symbol.isin(PHASE0_GENES)
-                 & triaged.significance.isin(["VUS", "CONFLICTING"])]
+def _phase0_slice(triaged):
+    return triaged[triaged.symbol.isin(PHASE0_GENES)
+                   & triaged.significance.isin(["VUS", "CONFLICTING"])]
+
+
+def test_uncertain_variants_are_partitioned_exactly(triaged):
+    """Every uncertain variant lands in exactly one of three outcomes.
+
+    This is the property the Phase 0 spike actually established — that the
+    normalised schema reproduces the flat spike's logic — and unlike a count it
+    is true no matter what ClinVar does next.
+    """
+    df = _phase0_slice(triaged)
+    up = int((df.triage_class == T.UPGRADE).sum())
+    down = int((df.triage_class == T.DOWNGRADE).sum())
+    same = int((df.triage_class == T.REMAINS_UNCERTAIN).sum())
+    assert up + down + same == len(df), "an uncertain variant fell outside the matrix"
+    assert len(df) > 0
+
+
+def test_phase0_baseline_has_not_drifted_implausibly(triaged):
+    """Guard the pipeline, not the upstream data.
+
+    The Phase 0 figures were measured against a fixed 2026-08-07 snapshot, and
+    asserting them exactly used to be the regression check. That stopped being
+    tenable once the site rebuilt weekly against live ClinVar: on 2026-08-10 the
+    build failed because ClinVar had reclassified two variants out of
+    "uncertain", one of them an upgrade candidate — which is precisely the event
+    this tool exists to surface. A test that breaks when the data does its job
+    is testing the wrong thing.
+
+    So this checks the shape instead: a few percent of movement is ClinVar
+    working, while a large swing means the join, the transcript mapping or a
+    connector has broken.
+    """
+    df = _phase0_slice(triaged)
     got = {
         "uncertain": len(df),
         "upgrades": int((df.triage_class == T.UPGRADE).sum()),
         "downgrades": int((df.triage_class == T.DOWNGRADE).sum()),
     }
-    assert got == PHASE0
+    for key, baseline in PHASE0.items():
+        drift = abs(got[key] - baseline) / baseline
+        assert drift < 0.10, (
+            f"{key} moved {drift:.1%} from the 2026-08-07 baseline "
+            f"({baseline} -> {got[key]}). Reclassification is normal; a swing "
+            f"this large is a pipeline fault."
+        )
 
 
 def test_no_assertion_variants_are_triaged_not_discarded(triaged):
