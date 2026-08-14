@@ -55,6 +55,32 @@ uv run python validate_phase1.py && uv run python validate_phase2.py
 uv run python audit_site.py                                      #  87  exported site vs the store
 ```
 
+### Engineering workflow (implemented tips)
+
+1. **Filter workflow runs first.** Start CI triage with the relevant branch, event
+   and status filters so you inspect only the failing run set.
+   ```bash
+   gh run list --workflow "Build and deploy site" --branch master --event push --status failure
+   ```
+2. **Pull failed logs before anything else.** Fetch logs for failed jobs first,
+   then drill into a specific job only if needed.
+   ```bash
+   gh run view <run-id> --log-failed
+   gh run view <run-id> --job <job-id> --log
+   ```
+3. **Prefer targeted code discovery tools.** Use file/content search (`glob`,
+   `rg`, `view`) for repository exploration instead of broad shell probing.
+   ```bash
+   rg "symbol_or_rule" .
+   ```
+4. **Report progress by milestone.** Group updates into clear milestones:
+   plan, implementation chunk(s), and validation.
+5. **Use one validation gate order.** Run checks in this order before final
+   merge: project tests/validators, automated code review, fixes for accepted
+   findings, CodeQL scan, then secret scan. If the automated code-review tool is
+   unavailable in the current environment, record that clearly and run a manual
+   review before merge.
+
 ---
 
 ## Refreshing the data
