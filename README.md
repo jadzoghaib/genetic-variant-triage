@@ -77,7 +77,9 @@ uv run python audit_site.py                                      #  87  exported
    plan, implementation chunk(s), and validation.
 5. **Use one validation gate order.** Run checks in this order before final
    merge: project tests/validators, automated code review, fixes for accepted
-   findings, CodeQL scan, then secret scan.
+   findings, CodeQL scan, then secret scan. If the automated code-review tool is
+   unavailable in the current environment, record that clearly and run a manual
+   review before merge.
 
 ---
 
